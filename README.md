@@ -17,6 +17,12 @@ gem install referalli
 
 or in your Gemfile: `gem "referalli"`.
 
+Until the gem is on RubyGems, install it from GitHub with Bundler:
+
+```ruby
+gem "referalli", git: "https://github.com/Referalli/referalli-ruby"
+```
+
 ## Quickstart
 
 Keep the `rk_` API key on your server.
