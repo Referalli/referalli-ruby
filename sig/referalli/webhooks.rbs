@@ -1,0 +1,27 @@
+module Referalli
+  class WebhookEvent
+    attr_reader id: String
+    attr_reader topic: String
+    attr_reader org_id: String
+    attr_reader livemode: bool
+    attr_reader created_at: String
+    attr_reader raw: Hash[String, untyped]
+    def initialize: (Hash[String, untyped] raw) -> void
+    def data: () -> untyped
+    def []: (String | Symbol key) -> untyped
+    def to_h: () -> Hash[String, untyped]
+  end
+
+  WEBHOOK_EVENT_CLASSES: Hash[String, singleton(WebhookEvent)]
+  TOPICS: Array[String]
+
+  module Webhook
+    TOLERANCE_SEC: Integer
+    def self.verify: (String raw_body, _ToH headers, String | Array[String] secrets, ?now: Numeric?, ?tolerance_sec: Numeric) -> bool
+    def self.construct_event: (String raw_body, _ToH headers, String | Array[String] secrets, ?now: Numeric?, ?tolerance_sec: Numeric) -> WebhookEvent
+  end
+
+  interface _ToH
+    def to_h: () -> Hash[untyped, untyped]
+  end
+end
