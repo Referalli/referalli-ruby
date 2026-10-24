@@ -168,6 +168,16 @@ module Referalli
     TOPIC = "webhook_endpoint.disabled"
   end
 
+  # `webhook_endpoint.failing`: A webhook endpoint keeps failing
+  class WebhookEndpointFailingEvent < WebhookEvent
+    TOPIC = "webhook_endpoint.failing"
+  end
+
+  # `webhook_endpoint.recovered`: A failing webhook endpoint recovered
+  class WebhookEndpointRecoveredEvent < WebhookEvent
+    TOPIC = "webhook_endpoint.recovered"
+  end
+
   # Topic => event class.
   WEBHOOK_EVENT_CLASSES = {
     "billing_event.recorded" => BillingEventRecordedEvent,
@@ -203,6 +213,8 @@ module Referalli
     "roi.payback_reached" => RoiPaybackReachedEvent,
     "tax.form_delivered" => TaxFormDeliveredEvent,
     "webhook_endpoint.disabled" => WebhookEndpointDisabledEvent,
+    "webhook_endpoint.failing" => WebhookEndpointFailingEvent,
+    "webhook_endpoint.recovered" => WebhookEndpointRecoveredEvent,
   }.freeze
 
   # Every topic the API publishes.

@@ -2,6 +2,6 @@
 # Changes belong in the generator, which overwrites this file.
 
 module Referalli
-  VERSION = "0.1.0"
+  VERSION = "0.2.0"
   API_VERSION = "2026-11-01"
 end

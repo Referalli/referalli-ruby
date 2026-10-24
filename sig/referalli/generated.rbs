@@ -41,6 +41,7 @@ module Referalli
     type commission_line = { "id" => String, "programId" => String, "partnerId" => String, "referralId" => String?, "type" => ("earned" | "approved" | "paid" | "reversed" | "adjusted"), "amountMinor" => Integer, "currency" => String, "relatedCommissionId" => String?, "holdUntil" => String?, "level" => Integer?, "memo" => String?, "settlementMethod" => String?, "settlementReference" => String?, "ts" => String, "billingEventId" => String?, "netMinor" => Integer?, "state" => ("pending" | "approved" | "paid")?, "events" => Array[::Referalli::Models::commission_event]? }
     type settlement = { "commissionId" => String, "paidEventId" => String, "partnerId" => String, "programId" => String, "amountMinor" => Integer, "currency" => String, "method" => ("store_credit" | "merchant_credit"), "reference" => String, "status" => ("paid") }
     type commission_rule = { "id" => String, "programId" => String, "version" => Integer, "config" => ::Referalli::Models::get_openapi_json_response, "createdAt" => String }
+    type billing_filter = { "metadata" => Hash[String, String]?, "productIds" => Array[String]?, "priceIds" => Array[String]?, "skus" => Array[String]? }
     type value_mapping = { "cash" => String?, "creditApplied" => String?, "discount" => String?, "cost" => String?, "productRef" => String?, "unit" => ("minor" | "major"), "version" => Integer }
     type value_mapping_preview_value = { "cashMinor" => Integer, "creditAppliedMinor" => Integer, "discountMinor" => Integer, "costMinor" => Integer?, "productRef" => String?, "fields" => Hash[String, Numeric], "warnings" => Array[String]?, "source" => ("mapping")?, "mappingVersion" => Integer? }
     type value_mapping_preview_would_record_item = { "kind" => String, "currency" => String, "confidence" => String, "source" => String, "extractionVersion" => Integer, "cashMinor" => Integer?, "creditAppliedMinor" => Integer?, "discountMinor" => Integer?, "costMinor" => Integer?, "productRef" => String? }
@@ -49,11 +50,17 @@ module Referalli
     type value_mapping_preview_events_item = { "currency" => String, "value" => ::Referalli::Models::value_mapping_preview_events_item_value, "wouldRecord" => Array[::Referalli::Models::value_mapping_preview_events_item_would_record_item], "index" => Integer }
     type value_mapping_preview = { "mappingVersion" => Integer, "currency" => String?, "value" => ::Referalli::Models::value_mapping_preview_value?, "wouldRecord" => Array[::Referalli::Models::value_mapping_preview_would_record_item]?, "events" => Array[::Referalli::Models::value_mapping_preview_events_item]? }
     type billing_connection_rotation = { "inProgress" => bool, "previousSecretExpiresAt" => String? }
-    type billing_connection = { "id" => String, "provider" => String, "name" => String, "status" => ("active" | "paused"), "createdAt" => String, "webhookUrl" => String, "needsCredentials" => bool, "hasCredentials" => bool, "valueMapping" => ::Referalli::Models::value_mapping?, "rotation" => ::Referalli::Models::billing_connection_rotation }
-    type created_billing_connection = { "id" => String, "provider" => String, "webhookSecret" => String, "webhookUrl" => String }
-    type billing_event = { "id" => String, "provider" => String, "type" => String, "customerRef" => String, "invoiceRef" => String?, "amountGross" => Integer, "tax" => Integer, "fees" => Integer, "currency" => String, "occurredAt" => String }
+    type billing_connection = { "id" => String, "provider" => String, "name" => String, "status" => ("active" | "paused"), "createdAt" => String, "webhookUrl" => String, "needsCredentials" => bool, "hasCredentials" => bool, "valueMapping" => ::Referalli::Models::value_mapping?, "filter" => ::Referalli::Models::billing_filter?, "rotation" => ::Referalli::Models::billing_connection_rotation }
+    type created_billing_connection = { "id" => String, "provider" => String, "webhookSecret" => String, "webhookUrl" => String, "filter" => ::Referalli::Models::billing_filter? }
+    type billing_event = { "id" => String, "provider" => String, "type" => String, "customerRef" => String, "invoiceRef" => String?, "amountGross" => Integer, "tax" => Integer, "fees" => Integer, "currency" => String, "occurredAt" => String, "connectionId" => String?, "productRef" => String, "status" => ("processed" | "ignored_by_filter"), "ignoredReason" => ("filter" | "internal_customer")?, "catalog" => Hash[String, Array[String]]? }
+    type internal_customer = { "customerRef" => String, "note" => String, "createdAt" => String }
+    type identity_provider_sample_hook_option1 = { "language" => String, "filename" => String, "code" => String }
+    type identity_provider_metadata_paths = { "anonId" => Array[String], "clickId" => Array[String], "coupon" => Array[String] }
+    type identity_provider = { "id" => String, "label" => String, "mechanism" => ("webhook" | "protocol"), "status" => ("ga" | "beta"), "docsUrl" => String, "vendorDocsUrl" => String, "secretKind" => ("hmac" | "svix" | "jwks" | "bearer"), "secretIssuedBy" => ("referalli" | "vendor"), "vendorSteps" => Array[String], "sampleHook" => ::Referalli::Models::identity_provider_sample_hook_option1?, "metadataPaths" => ::Referalli::Models::identity_provider_metadata_paths }
     type webhook_endpoint_rotation = { "inProgress" => bool, "previousSecretExpiresAt" => String? }
-    type webhook_endpoint = { "id" => String, "url" => String, "topics" => Array[String], "programIds" => Array[String]?, "status" => ("active" | "paused" | "disabled"), "legacySignature" => bool, "rotation" => ::Referalli::Models::webhook_endpoint_rotation, "failingSince" => String?, "disabledAt" => String?, "disabledReason" => String?, "createdAt" => String }
+    type webhook_endpoint_last_failure_option1 = { "statusCode" => Integer?, "error" => String?, "at" => String }
+    type webhook_endpoint = { "id" => String, "url" => String, "topics" => Array[String], "programIds" => Array[String]?, "status" => ("active" | "paused" | "disabled"), "legacySignature" => bool, "rotation" => ::Referalli::Models::webhook_endpoint_rotation, "failingSince" => String?, "disabledAt" => String?, "disabledReason" => String?, "health" => ("healthy" | "failing" | "disabled" | "paused"), "lastSuccessAt" => String?, "lastFailure" => ::Referalli::Models::webhook_endpoint_last_failure_option1?, "consecutiveFailures" => Integer, "alertContacts" => Array[String], "createdAt" => String }
+    type health_check = { "id" => String, "ok" => bool, "detail" => String, "fix" => String?, "docs" => String?, "hop" => String? }
     type webhook_delivery = { "id" => String, "endpointId" => String, "topic" => String, "status" => String, "attempts" => Integer, "lastStatusCode" => Integer?, "lastAttemptAt" => String?, "nextAt" => String?, "createdAt" => String }
     type payout_profile = { "partnerId" => String, "method" => String, "payoutCurrency" => String, "minThresholdMinor" => Integer, "taxFormType" => String?, "taxFormSubmittedAt" => String? }
     type tax_profile = { "legalName" => String?, "address" => String?, "country" => String?, "vatId" => String?, "ein" => String?, "domesticVatBps" => Integer?, "viesCheck" => bool, "filingProvider" => String, "filingConnected" => bool }
@@ -79,7 +86,7 @@ module Referalli
     type api_key = { "id" => String, "name" => String, "prefix" => String, "scopes" => Array[String], "apiVersion" => String, "publishable" => bool, "allowedOrigins" => Array[String], "livemode" => bool, "owner" => String?, "pairId" => String?, "createdBy" => ::Referalli::Models::api_key_created_by_option1?, "expiresAt" => String?, "expired" => bool, "lastUsedAt" => String?, "createdAt" => String, "revokedAt" => String? }
     type auth_connection_rotation = { "inProgress" => bool, "previousSecretExpiresAt" => String? }
     type auth_connection = { "id" => String, "provider" => ("clerk" | "supabase" | "workos" | "generic" | "atlas" | "custom"), "programId" => String, "name" => String, "status" => String, "createdAt" => String, "rotation" => ::Referalli::Models::auth_connection_rotation, "instanceId" => String?, "autoEnrollUsers" => bool?, "destinationUrl" => String?, "signatureVersion" => ("v1+v2" | "v2")?, "requiresV2" => bool? }
-    type created_auth_connection = { "id" => String, "provider" => String, "secret" => String, "webhookUrl" => String?, "metadataKeys" => Hash[String, String]?, "programId" => String?, "instanceId" => String?, "autoEnrollUsers" => bool?, "destinationUrl" => String?, "signupsUrl" => String?, "eraseUrl" => String?, "exportUrl" => String? }
+    type created_auth_connection = { "id" => String, "provider" => String, "secret" => String, "webhookUrl" => String?, "docsUrl" => String?, "metadataKeys" => Hash[String, String]?, "programId" => String?, "instanceId" => String?, "autoEnrollUsers" => bool?, "destinationUrl" => String?, "signupsUrl" => String?, "eraseUrl" => String?, "exportUrl" => String? }
     type fraud_case = { "id" => String, "partnerId" => String?, "referralId" => String?, "kind" => String, "status" => String, "evidence" => ::Referalli::Models::get_openapi_json_response?, "action" => String?, "createdAt" => String, "resolvedAt" => String? }
     type customer_export = { "customerRef" => String, "referrals" => Array[::Referalli::Models::get_openapi_json_response], "associations" => Array[::Referalli::Models::get_openapi_json_response], "identityLinks" => Array[::Referalli::Models::get_openapi_json_response], "billingEvents" => Array[::Referalli::Models::get_openapi_json_response], "conversionEvents" => Array[::Referalli::Models::get_openapi_json_response] }
     type partner_export = { "partner" => ::Referalli::Models::get_openapi_json_response, "enrollments" => Array[::Referalli::Models::get_openapi_json_response], "links" => Array[::Referalli::Models::get_openapi_json_response], "coupons" => Array[::Referalli::Models::get_openapi_json_response], "payoutProfile" => ::Referalli::Models::get_openapi_json_response?, "commissionEvents" => Array[::Referalli::Models::get_openapi_json_response], "payouts" => Array[::Referalli::Models::get_openapi_json_response] }
@@ -202,6 +209,10 @@ module Referalli
     type privacy_request_completed_event = { "id" => String, "topic" => ("privacy.request_completed"), "orgId" => String, "livemode" => bool, "createdAt" => String, "data" => ::Referalli::Models::privacy_request_completed_event_data }
     type webhook_endpoint_disabled_event_data = { "endpointId" => String, "url" => String, "reason" => String, "lastStatusCode" => Integer?, "days" => Integer }
     type webhook_endpoint_disabled_event = { "id" => String, "topic" => ("webhook_endpoint.disabled"), "orgId" => String, "livemode" => bool, "createdAt" => String, "data" => ::Referalli::Models::webhook_endpoint_disabled_event_data }
+    type webhook_endpoint_failing_event_data = { "endpointId" => String, "url" => String, "stage" => ("1h" | "24h"), "failingSince" => String, "consecutiveFailures" => Integer, "lastStatusCode" => Integer?, "sampleError" => String?, "disablesAt" => String }
+    type webhook_endpoint_failing_event = { "id" => String, "topic" => ("webhook_endpoint.failing"), "orgId" => String, "livemode" => bool, "createdAt" => String, "data" => ::Referalli::Models::webhook_endpoint_failing_event_data }
+    type webhook_endpoint_recovered_event_data = { "endpointId" => String, "url" => String, "failingSince" => String, "downForMs" => Integer }
+    type webhook_endpoint_recovered_event = { "id" => String, "topic" => ("webhook_endpoint.recovered"), "orgId" => String, "livemode" => bool, "createdAt" => String, "data" => ::Referalli::Models::webhook_endpoint_recovered_event_data }
     type post_torg_token_visit_response = { "ok" => bool, "clickId" => String? }
     type get_torg_token_codes_code_response_referee_reward_option1 = { "kind" => String, "bps" => Integer?, "amountMinor" => Integer?, "capMinor" => Integer?, "currency" => String, "on" => String }
     type get_torg_token_codes_code_response = { "valid" => bool, "partnerDisplayName" => String, "refereeReward" => ::Referalli::Models::get_torg_token_codes_code_response_referee_reward_option1? }
@@ -221,6 +232,17 @@ module Referalli
     type get_well_known_assetlinks_json_response_value_item_target = { "namespace" => ("android_app"), "package_name" => String, "sha256_cert_fingerprints" => Array[String] }
     type get_well_known_assetlinks_json_response_value_item = { "relation" => Array[String], "target" => ::Referalli::Models::get_well_known_assetlinks_json_response_value_item_target }
     type get_well_known_assetlinks_json_response = Array[::Referalli::Models::get_well_known_assetlinks_json_response_value_item]
+    type get_well_known_forgedeck_embed_json_response_checkers = { "userAgent" => String, "egress" => Array[String] }
+    type get_well_known_forgedeck_embed_json_response_surfaces_tracking_snippet_cookie_days_option2 = { "default" => Integer, "max" => Integer, "note" => String }
+    type get_well_known_forgedeck_embed_json_response_surfaces_tracking_snippet_storage_item_purpose = { "en" => String }
+    type get_well_known_forgedeck_embed_json_response_surfaces_tracking_snippet_storage_item = { "name" => String, "type" => ("cookie" | "localStorage"), "category" => String, "lifetime" => String, "purpose" => ::Referalli::Models::get_well_known_forgedeck_embed_json_response_surfaces_tracking_snippet_storage_item_purpose, "legacy" => bool? }
+    type get_well_known_forgedeck_embed_json_response_surfaces_tracking_snippet = { "script" => String, "csp" => Hash[String, Array[String]], "consentCategory" => String, "consentFallbackCategory" => String, "consentAdapters" => Array[String], "consentDefault" => Hash[String, untyped]?, "cookieDays" => (Integer | ::Referalli::Models::get_well_known_forgedeck_embed_json_response_surfaces_tracking_snippet_cookie_days_option2), "storage" => Array[::Referalli::Models::get_well_known_forgedeck_embed_json_response_surfaces_tracking_snippet_storage_item] }
+    type get_well_known_forgedeck_embed_json_response_surfaces_portal_embed_storage_item_purpose = { "en" => String }
+    type get_well_known_forgedeck_embed_json_response_surfaces_portal_embed_storage_item = { "name" => String, "type" => ("cookie" | "localStorage"), "category" => String, "lifetime" => String, "purpose" => ::Referalli::Models::get_well_known_forgedeck_embed_json_response_surfaces_portal_embed_storage_item_purpose, "legacy" => bool? }
+    type get_well_known_forgedeck_embed_json_response_surfaces_portal_embed = { "script" => String, "csp" => Hash[String, Array[String]], "consentCategory" => String, "storage" => Array[::Referalli::Models::get_well_known_forgedeck_embed_json_response_surfaces_portal_embed_storage_item] }
+    type get_well_known_forgedeck_embed_json_response_surfaces = { "tracking-snippet" => ::Referalli::Models::get_well_known_forgedeck_embed_json_response_surfaces_tracking_snippet, "portal-embed" => ::Referalli::Models::get_well_known_forgedeck_embed_json_response_surfaces_portal_embed }
+    type get_well_known_forgedeck_embed_json_response_changes_item = { "effective" => String, "surface" => String, "add" => Array[String]?, "remove" => Array[String]?, "note" => String }
+    type get_well_known_forgedeck_embed_json_response = { "schema" => String, "product" => ("referalli"), "updated" => String, "openapi" => String, "llms" => String, "status" => String, "docs" => String, "checkers" => ::Referalli::Models::get_well_known_forgedeck_embed_json_response_checkers, "org" => String?, "surfaces" => ::Referalli::Models::get_well_known_forgedeck_embed_json_response_surfaces, "changes" => Array[::Referalli::Models::get_well_known_forgedeck_embed_json_response_changes_item] }
     type post_agents_register_response = { "agentId" => String, "wallet" => String, "instantPayout" => bool }
     type post_torg_token_agent_attribute_response = { "attributed" => bool, "referralId" => String, "agentWallet" => String }
     type post_torg_token_agent_negotiate_response = { "decision" => ("accept" | "counter" | "reject"), "rateBps" => Integer?, "counterBps" => Integer?, "partnerId" => String?, "reason" => String }
@@ -229,6 +251,7 @@ module Referalli
     type get_versions_response = { "latest" => String, "versions" => Array[::Referalli::Models::get_versions_response_versions_item], "deprecationPolicy" => String }
     type get_auth_providers_response_details_item = { "id" => ("instance" | "atlasid"), "name" => String, "atlas" => bool }
     type get_auth_providers_response = { "providers" => Array[("instance" | "atlasid")], "details" => Array[::Referalli::Models::get_auth_providers_response_details_item] }
+    type post_auth_backchannel_logout_response = { "ok" => bool }
     type post_auth_logout_response = { "ok" => bool, "logoutUrl" => String? }
     type post_orgs_response = { "orgId" => String }
     type get_me_response_user_option1 = { "id" => String, "email" => String, "name" => String?, "emailVerified" => bool }
@@ -236,12 +259,26 @@ module Referalli
     type get_me_response_api_key = { "id" => String, "name" => String, "prefix" => String, "scopes" => Array[String], "apiVersion" => String?, "livemode" => bool, "publishable" => bool, "owner" => String?, "expiresAt" => String? }
     type get_me_response_org = { "id" => String, "name" => String }
     type get_me_response = { "user" => ::Referalli::Models::get_me_response_user_option1?, "memberships" => Array[::Referalli::Models::get_me_response_memberships_item], "apiKey" => ::Referalli::Models::get_me_response_api_key?, "org" => ::Referalli::Models::get_me_response_org? }
+    type get_portal_auth_current_response = { "adapter" => ("referalli" | "oidc" | "custom"), "name" => String?, "startUrl" => String? }
+    type get_org_portal_auth_response_adapters_item = { "id" => ("referalli" | "oidc" | "custom"), "label" => String, "status" => ("ga" | "beta"), "docsUrl" => String }
+    type get_org_portal_auth_response = { "adapter" => ("referalli" | "oidc" | "custom"), "config" => Hash[String, untyped], "adapters" => Array[::Referalli::Models::get_org_portal_auth_response_adapters_item], "jwtAudience" => String, "jwtSignInUrl" => String, "redirectUri" => String, "hasSecret" => bool, "status" => String, "lastOkAt" => String?, "lastError" => String? }
+    type put_org_portal_auth_response_adapters_item = { "id" => ("referalli" | "oidc" | "custom"), "label" => String, "status" => ("ga" | "beta"), "docsUrl" => String }
+    type put_org_portal_auth_response = { "adapter" => ("referalli" | "oidc" | "custom"), "config" => Hash[String, untyped], "adapters" => Array[::Referalli::Models::put_org_portal_auth_response_adapters_item], "jwtAudience" => String, "jwtSignInUrl" => String, "redirectUri" => String }
+    type post_org_portal_auth_test_response = { "ok" => bool, "detail" => String, "fix" => String? }
     type get_hosts_current_response_value_option1_branding = { "logoUrl" => String, "theme" => Hash[String, String] }
     type get_hosts_current_response_value_option1_programs_item = { "handle" => String, "name" => String }
-    type get_hosts_current_response_value_option1 = { "kind" => ("portal"), "orgId" => String, "orgName" => String, "branding" => ::Referalli::Models::get_hosts_current_response_value_option1_branding, "programs" => Array[::Referalli::Models::get_hosts_current_response_value_option1_programs_item] }
-    type get_hosts_current_response_value_option2 = { "kind" => ("link") }
+    type get_hosts_current_response_value_option1_consent_tags_item = { "tag" => ("script"), "attrs" => Hash[String, (String | bool)], "inline" => String? }
+    type get_hosts_current_response_value_option1_consent_settings_link_option1 = { "call" => String?, "attrs" => Hash[String, String]? }
+    type get_hosts_current_response_value_option1_consent_builtin = { "policyUrl" => String, "text" => Hash[String, String]? }
+    type get_hosts_current_response_value_option1_consent = { "mode" => ("cookiemunch" | "cmp" | "builtin" | "none"), "provider" => String, "tags" => Array[::Referalli::Models::get_hosts_current_response_value_option1_consent_tags_item], "settingsLink" => ::Referalli::Models::get_hosts_current_response_value_option1_consent_settings_link_option1?, "builtin" => ::Referalli::Models::get_hosts_current_response_value_option1_consent_builtin? }
+    type get_hosts_current_response_value_option1_chat_option1_tags_item = { "tag" => ("script"), "attrs" => Hash[String, (String | bool)], "inline" => String? }
+    type get_hosts_current_response_value_option1_chat_option1 = { "provider" => String, "tags" => Array[::Referalli::Models::get_hosts_current_response_value_option1_chat_option1_tags_item] }
+    type get_hosts_current_response_value_option1 = { "kind" => ("portal"), "orgId" => String, "orgName" => String, "branding" => ::Referalli::Models::get_hosts_current_response_value_option1_branding, "programs" => Array[::Referalli::Models::get_hosts_current_response_value_option1_programs_item], "consent" => ::Referalli::Models::get_hosts_current_response_value_option1_consent, "chat" => ::Referalli::Models::get_hosts_current_response_value_option1_chat_option1?, "csp" => String }
+    type get_hosts_current_response_value_option2 = { "kind" => ("link"), "csp" => String }
     type get_hosts_current_response_value_option3 = { "kind" => ("app") }
     type get_hosts_current_response = (::Referalli::Models::get_hosts_current_response_value_option1 | ::Referalli::Models::get_hosts_current_response_value_option2 | ::Referalli::Models::get_hosts_current_response_value_option3)
+    type get_chatly_identity_response_identity_option1 = { "externalId" => String, "email" => String, "name" => String?, "userHash" => String }
+    type get_chatly_identity_response = { "identity" => ::Referalli::Models::get_chatly_identity_response_identity_option1? }
     type post_mobile_purchases_response = { "conversions" => Integer, "linesCreated" => Integer, "reversals" => Integer }
     type patch_org_response = { "id" => String, "name" => String, "plan" => String, "settings" => ::Referalli::Models::get_openapi_json_response, "payout_kyc_required" => bool }
     type get_org_members_response = { "object" => ("list"), "data" => Array[::Referalli::Models::member], "has_more" => bool, "next_cursor" => String? }
@@ -321,6 +358,7 @@ module Referalli
     type put_billing_connections_id_value_mapping_response = { "id" => String, "valueMapping" => ::Referalli::Models::value_mapping }
     type post_billing_connections_id_rotate_secret_response = { "id" => String, "provider" => String, "webhookSecret" => String, "previousSecretExpiresAt" => String }
     type get_billing_events_response = { "object" => ("list"), "data" => Array[::Referalli::Models::billing_event], "has_more" => bool, "next_cursor" => String? }
+    type post_billing_internal_customers_response = { "customerRef" => String, "note" => String }
     type put_partners_id_payout_profile_response = { "id" => String }
     type patch_partners_id_payout_profile_response = { "partnerId" => String, "method" => String, "payoutCurrency" => String, "minThresholdMinor" => Integer }
     type post_payout_runs_id_execute_response = { "sent" => Integer, "submitted" => Integer, "failed" => Integer }
@@ -414,19 +452,24 @@ module Referalli
     type get_partner_programs_program_id_leaderboard_response_rows_item = { "rank" => Integer, "name" => String, "approvedMinor" => Integer, "you" => bool }
     type get_partner_programs_program_id_leaderboard_response = { "contest" => ::Referalli::Models::get_partner_programs_program_id_leaderboard_response_contest_option1?, "rows" => Array[::Referalli::Models::get_partner_programs_program_id_leaderboard_response_rows_item] }
     type post_partner_programs_program_id_apply_response = { "enrollmentId" => String, "status" => ("applied") }
-    type post_webhook_endpoints_response = { "id" => String, "url" => String, "topics" => Array[String], "programIds" => Array[String]?, "legacySignature" => bool, "secret" => String }
+    type post_webhook_endpoints_response = { "id" => String, "url" => String, "topics" => Array[String], "programIds" => Array[String]?, "legacySignature" => bool, "alertContacts" => Array[String], "secret" => String }
     type get_webhook_endpoints_response = { "object" => ("list"), "data" => Array[::Referalli::Models::webhook_endpoint], "has_more" => bool, "next_cursor" => String? }
+    type patch_webhook_endpoints_id_response = untyped
     type post_webhook_endpoints_id_rotate_secret_response = { "id" => String, "secret" => String, "previousSecretExpiresAt" => String }
     type get_webhook_deliveries_response = { "object" => ("list"), "data" => Array[::Referalli::Models::webhook_delivery], "has_more" => bool, "next_cursor" => String? }
     type get_webhook_endpoints_id_deliveries_response = { "object" => ("list"), "data" => Array[::Referalli::Models::webhook_delivery], "has_more" => bool, "next_cursor" => String? }
     type get_webhook_deliveries_id_response = untyped
+    type post_webhook_endpoints_id_replay_response = { "endpointId" => String, "since" => String, "replayed" => Integer }
     type post_sandbox_simulate_response = { "customerRef" => String, "events" => Integer, "conversions" => Integer, "linesCreated" => Integer, "reversals" => Integer }
     type post_import_provider_response = { "partnersCreated" => Integer, "partnersSkipped" => Integer, "linksCreated" => Integer, "couponsCreated" => Integer, "codesSkipped" => Array[String], "referralParams" => Array[String], "unpaidImportedMinor" => Integer, "paidImportedMinor" => Integer }
     type get_openapi_json_response = Hash[String, untyped]
-    type get_branding_response = { "logoUrl" => String?, "theme" => ::Referalli::Models::get_openapi_json_response?, "portalDomain" => String?, "portalDomainVerified" => bool, "portalDomainStatus" => ("none" | "pending" | "provisioning" | "active"), "linkDomain" => String?, "linkDomainVerified" => bool, "linkDomainStatus" => ("none" | "pending" | "provisioning" | "active"), "emailFrom" => String? }
+    type get_branding_response_warnings_item = { "code" => ("low_contrast"), "foreground" => String, "background" => String, "ratio" => Numeric, "minimum" => Numeric, "message" => String }
+    type get_branding_response = { "logoUrl" => String?, "theme" => ::Referalli::Models::get_openapi_json_response?, "portalDomain" => String?, "portalDomainVerified" => bool, "portalDomainStatus" => ("none" | "pending" | "provisioning" | "active"), "linkDomain" => String?, "linkDomainVerified" => bool, "linkDomainStatus" => ("none" | "pending" | "provisioning" | "active"), "emailFrom" => String?, "warnings" => Array[::Referalli::Models::get_branding_response_warnings_item] }
     type post_branding_link_domain_response = { "domain" => String, "cnameTarget" => String, "txtRecord" => String, "txtName" => String, "verified" => bool }
     type post_branding_link_domain_verify_response = { "domain" => String, "verified" => bool, "status" => ("provisioning" | "active"), "message" => String? }
     type post_branding_domain_response = { "domain" => String, "cnameTarget" => String, "txtRecord" => String, "txtName" => String, "verified" => bool, "instructions" => String }
+    type put_branding_response_warnings_item = { "code" => ("low_contrast"), "foreground" => String, "background" => String, "ratio" => Numeric, "minimum" => Numeric, "message" => String }
+    type put_branding_response = { "ok" => bool, "warnings" => Array[::Referalli::Models::put_branding_response_warnings_item] }
     type post_embed_tokens_response = { "token" => String, "expiresAt" => String }
     type get_embed_summary_response_partner = { "name" => String, "email" => String }
     type get_embed_summary_response_balances_item = { "currency" => String, "pending" => Integer, "approved" => Integer, "paid" => Integer }
@@ -470,6 +513,11 @@ module Referalli
     type get_rewards_response = { "object" => ("list"), "data" => Array[::Referalli::Models::get_rewards_response_data_item], "has_more" => bool, "next_cursor" => String? }
     type get_rewards_lookup_code_response = { "valid" => bool, "rewardId" => String?, "kind" => String?, "amountMinor" => Integer?, "currency" => String?, "status" => String? }
     type post_rewards_redeem_by_code_response = { "ok" => bool, "rewardId" => String, "grantId" => String, "status" => ("issued" | "redeemed"), "currency" => String, "requestedMinor" => Integer, "redeemedMinor" => Integer, "remainingMinor" => Integer, "capped" => bool }
+    type post_rewards_response = { "id" => String, "partnerId" => String, "programId" => String, "ruleKey" => String?, "reason" => String, "amountMinor" => Integer, "currency" => String, "commissionId" => String?, "idempotencyKey" => String, "createdAt" => String, "replayed" => bool }
+    type get_rewards_granted_response_value_item = { "id" => String, "partnerId" => String, "programId" => String, "ruleKey" => String?, "reason" => String, "amountMinor" => Integer, "currency" => String, "commissionId" => String?, "idempotencyKey" => String, "createdAt" => String }
+    type get_rewards_granted_response = Array[::Referalli::Models::get_rewards_granted_response_value_item]
+    type put_rewards_rules_key_response = { "key" => String, "event" => String?, "programId" => String?, "amountMinor" => Integer, "currency" => String, "reason" => String, "enabled" => bool, "updatedAt" => String }
+    type delete_rewards_rules_key_response = { "ok" => bool }
     type get_programs_id_groups_response = { "object" => ("list"), "data" => Array[::Referalli::Models::partner_group], "has_more" => bool, "next_cursor" => String? }
     type put_programs_id_partners_partner_id_group_response = { "partnerId" => String, "programId" => String, "groupId" => String? }
     type get_programs_id_promotions_response = { "object" => ("list"), "data" => Array[::Referalli::Models::promotion], "has_more" => bool, "next_cursor" => String? }
@@ -584,7 +632,9 @@ module Referalli
     type post_partner_security_totp_enable_response = { "enabled" => bool }
     type post_partner_security_totp_disable_response = { "enabled" => bool }
     type get_partner_security_response = { "totpEnabled" => bool }
+    type get_auth_connections_providers_response = { "data" => Array[::Referalli::Models::identity_provider] }
     type get_auth_connections_response = { "object" => ("list"), "data" => Array[::Referalli::Models::auth_connection], "has_more" => bool, "next_cursor" => String? }
+    type put_auth_connections_id_secret_response = { "id" => String, "provider" => String, "ok" => bool }
     type post_auth_connections_id_rotate_secret_response = { "id" => String, "provider" => String, "secret" => String, "previousSecretExpiresAt" => String }
     type patch_auth_connections_id_response = { "id" => String, "provider" => String, "name" => String, "status" => ("active" | "paused"), "autoEnrollUsers" => bool?, "destinationUrl" => String?, "signatureVersion" => ("v1+v2" | "v2")?, "requiresV2" => bool? }
     type post_auth_connections_id_revoke_previous_secret_response = { "ok" => bool, "revoked" => bool }
@@ -592,6 +642,8 @@ module Referalli
     type post_auth_connections_id_signups_response_reasoning = { "notes" => Array[String], "codes" => Array[::Referalli::Models::signup_reason_code] }
     type post_auth_connections_id_signups_response_partner = { "id" => String, "code" => String, "link" => String?, "persisted" => bool? }
     type post_auth_connections_id_signups_response = { "test" => bool?, "referral" => ::Referalli::Models::post_auth_connections_id_signups_response_referral_option1?, "reasoning" => ::Referalli::Models::post_auth_connections_id_signups_response_reasoning?, "partner" => ::Referalli::Models::post_auth_connections_id_signups_response_partner? }
+    type post_auth_connections_id_partners_response_partner = { "id" => String, "code" => String, "link" => String? }
+    type post_auth_connections_id_partners_response = { "partner" => ::Referalli::Models::post_auth_connections_id_partners_response_partner }
     type post_auth_connections_id_erase_response_customer_option1 = { "customerRef" => String, "pseudonym" => String }
     type post_auth_connections_id_erase_response_partner_option1 = { "partnerId" => String, "alreadyForgotten" => bool }
     type post_auth_connections_id_erase_response = { "ok" => bool, "erased" => bool, "customer" => ::Referalli::Models::post_auth_connections_id_erase_response_customer_option1?, "partner" => ::Referalli::Models::post_auth_connections_id_erase_response_partner_option1? }
@@ -606,6 +658,8 @@ module Referalli
     type post_auth_connections_id_signals_response_reversed_item = { "lineId" => String, "amountMinor" => Integer, "currency" => String }
     type post_auth_connections_id_signals_response_partner_option1 = { "id" => String, "status" => String }
     type post_auth_connections_id_signals_response = { "ok" => bool, "signal" => ("email_verified" | "banned" | "unbanned" | "fraud_confirmed" | "self_referral"), "referrals" => Array[::Referalli::Models::post_auth_connections_id_signals_response_referrals_item], "reversed" => Array[::Referalli::Models::post_auth_connections_id_signals_response_reversed_item], "partner" => ::Referalli::Models::post_auth_connections_id_signals_response_partner_option1?, "notes" => Array[String]? }
+    type post_auth_connections_install_response = { "redirectTo" => String }
+    type post_oauth_token_response = { "token_type" => ("connection_secret"), "connectionId" => String, "provider" => String, "instanceId" => String, "programId" => String, "secret" => String, "reinstalled" => bool, "signupsUrl" => String, "partnersUrl" => String, "eraseUrl" => String, "exportUrl" => String }
     type get_org_sso_response_provider_option1 = { "name" => String, "label" => String }
     type get_org_sso_response_connections_item = { "id" => String, "type" => String, "status" => String, "allowedDomains" => Array[String] }
     type get_org_sso_response_tickets_item = { "id" => String, "status" => String, "expiresAt" => String, "createdAt" => String }
@@ -615,6 +669,8 @@ module Referalli
     type post_org_sso_tickets_id_revoke_response = { "id" => String, "status" => ("revoked") }
     type get_org_sso_connections_id_saml_metadata_response = { "spEntityId" => String, "acsUrl" => String, "metadataXml" => String }
     type patch_org_sso_response = { "requireSso" => bool, "roleMapping" => Hash[String, String] }
+    type put_org_sso_direct_response = { "adapter" => ("oidc" | "workos"), "config" => Hash[String, untyped], "hasSecret" => bool, "signInUrl" => String, "redirectUri" => String }
+    type delete_org_sso_direct_response = { "removed" => bool }
     type post_partner_auth_wallet_nonce_response = { "nonce" => String, "message" => String }
     type post_partner_auth_wallet_verify_response = { "accountId" => String, "wallet" => String }
     type post_onchain_connections_response = { "id" => String, "secret" => String, "webhookUrl" => String }
@@ -623,7 +679,57 @@ module Referalli
     type get_public_programs_handle_response_branding = { "logoUrl" => String?, "theme" => ::Referalli::Models::get_openapi_json_response? }
     type get_public_programs_handle_response = { "handle" => String, "programId" => String, "programName" => String, "merchant" => String, "trackingToken" => String, "cookieWindowDays" => Integer, "termsMd" => String, "pitch" => String, "autoApprove" => bool, "commission" => ::Referalli::Models::get_openapi_json_response?, "branding" => ::Referalli::Models::get_public_programs_handle_response_branding }
     type post_public_programs_handle_join_response = { "accountId" => String, "status" => ("approved" | "applied"), "link" => String?, "linkUrl" => String?, "code" => String?, "portalUrl" => String }
-    type post_webhooks_billing_connection_id_response_results_item = { "duplicate" => bool, "billingEventId" => String?, "conversions" => Integer, "linesCreated" => Integer, "reversals" => Integer }
+    type get_integration_health_response = { "ok" => bool, "checks" => Array[::Referalli::Models::health_check], "generatedAt" => String }
+    type get_plans_response_plans_item = { "key" => String, "label" => String, "priceMinor" => Integer, "currency" => ("usd"), "interval" => ("month"), "maxPrograms" => Integer?, "maxPartners" => Integer?, "marketplace" => bool, "discovery" => bool, "linkDomain" => bool, "portalDomain" => bool, "apiPerSec" => Integer, "apiBurst" => Integer }
+    type get_plans_response = { "plans" => Array[::Referalli::Models::get_plans_response_plans_item] }
+    type get_events_response_events_item = { "id" => String, "topic" => String, "orgId" => String, "livemode" => bool, "createdAt" => String, "data" => ::Referalli::Models::get_openapi_json_response }
+    type get_events_response = { "events" => Array[::Referalli::Models::get_events_response_events_item], "hasMore" => bool, "nextCursor" => String? }
+    type get_support_context_response_partner_option1 = { "id" => String, "name" => String, "status" => String, "tier" => String?, "programs" => Array[String], "referralLink" => String?, "pendingMinor" => Integer, "approvedMinor" => Integer, "paidMinor" => Integer, "currency" => String, "nextPayoutAt" => String?, "flags" => Array[String] }
+    type get_support_context_response_customer_option1_referred_by_option1 = { "partnerId" => String, "name" => String }
+    type get_support_context_response_customer_option1_reward_state_option1 = { "kind" => String, "status" => String, "amountMinor" => Integer, "currency" => String, "remainingMinor" => Integer }
+    type get_support_context_response_customer_option1 = { "referredBy" => ::Referalli::Models::get_support_context_response_customer_option1_referred_by_option1?, "attributedAt" => String?, "rewardState" => ::Referalli::Models::get_support_context_response_customer_option1_reward_state_option1?, "commissionsMinor" => Integer, "currency" => String? }
+    type get_support_context_response_links = { "dashboard" => String, "partner" => String?, "referral" => String? }
+    type get_support_context_response = { "partner" => ::Referalli::Models::get_support_context_response_partner_option1?, "customer" => ::Referalli::Models::get_support_context_response_customer_option1?, "links" => ::Referalli::Models::get_support_context_response_links }
+    type get_support_apps_response_value_item_install = { "kind" => ("api" | "manifest" | "oauth")?, "steps" => Array[String], "manifestPath" => String? }
+    type get_support_apps_response_value_item_config_option1 = { "subdomain" => untyped, "cardKey" => untyped, "hasPublicKey" => bool }
+    type get_support_apps_response_value_item = { "id" => String, "name" => String, "status" => ("ga" | "beta"), "docsUrl" => String, "vendorDocsUrl" => String, "secretSource" => ("vendor" | "minted" | "public_key"), "install" => ::Referalli::Models::get_support_apps_response_value_item_install, "cardUrl" => String, "enabled" => bool, "configured" => bool, "config" => ::Referalli::Models::get_support_apps_response_value_item_config_option1?, "lastOkAt" => String?, "lastError" => String? }
+    type get_support_apps_response = Array[::Referalli::Models::get_support_apps_response_value_item]
+    type put_support_apps_adapter_response = { "adapter" => String, "enabled" => bool, "cardUrl" => String, "secret" => String? }
+    type delete_support_apps_adapter_response = { "ok" => bool }
+    type post_support_apps_adapter_test_response = { "found" => bool, "context" => ::Referalli::Models::get_support_context_response?, "rendered" => untyped }
+    type post_support_cards_org_id_adapter_response = Hash[String, untyped]
+    type get_privacy_executors_response_value_item_install = { "kind" => ("api" | "manifest" | "oauth")?, "steps" => Array[String], "manifestPath" => String? }
+    type get_privacy_executors_response_value_item_config_option1 = { "hasPublicKey" => bool, "algorithm" => String?, "sombraUrl" => String? }
+    type get_privacy_executors_response_value_item_health = { "ok" => bool, "detail" => String, "fix" => String? }
+    type get_privacy_executors_response_value_item = { "id" => String, "name" => String, "status" => ("ga" | "beta"), "docsUrl" => String, "vendorDocsUrl" => String, "keyKind" => ("bearer" | "hmac" | "standard-webhooks" | "vendor-jwt"), "install" => ::Referalli::Models::get_privacy_executors_response_value_item_install, "url" => String, "enabled" => bool, "hasKey" => bool, "hasVendorSecret" => bool, "config" => ::Referalli::Models::get_privacy_executors_response_value_item_config_option1?, "health" => ::Referalli::Models::get_privacy_executors_response_value_item_health, "lastOkAt" => String?, "lastError" => String? }
+    type get_privacy_executors_response = Array[::Referalli::Models::get_privacy_executors_response_value_item]
+    type post_privacy_executor_keys_response = { "adapter" => String, "url" => String, "enabled" => bool, "key" => String? }
+    type delete_privacy_executors_adapter_response = { "ok" => bool }
+    type post_privacy_executors_adapter_check_response = { "adapter" => String, "ok" => bool, "detail" => String, "fix" => String? }
+    type get_privacy_executor_requests_response_value_item = { "id" => String, "adapter" => String, "vendorRequestId" => String?, "op" => String, "status" => String, "createdAt" => String, "completedAt" => String? }
+    type get_privacy_executor_requests_response = Array[::Referalli::Models::get_privacy_executor_requests_response_value_item]
+    type post_account_close_response = { "closed" => bool }
+    type get_clicks_consent_coverage_response = { "days" => Integer, "since" => String, "attributed" => Integer, "withEvidence" => Integer, "share" => Numeric? }
+    type get_clicks_id_response_consent_option1 = { "provider" => String, "state" => ("granted" | "denied" | "unknown"), "at" => String?, "stamp" => String?, "tcString" => String?, "gppString" => String?, "purposes" => Array[String]? }
+    type get_clicks_id_response = { "id" => String, "programId" => String, "partnerId" => String, "linkId" => String?, "ts" => String, "source" => ("redirect" | "snippet" | "api"), "eligible" => bool, "fraudScore" => Integer, "anonId" => String?, "consent" => ::Referalli::Models::get_clicks_id_response_consent_option1? }
+    type get_org_tracking_consent_response_adapters_item = { "id" => String, "name" => String, "defaultCategory" => String?, "status" => ("ga" | "beta"), "docsUrl" => String }
+    type get_org_tracking_consent_response = { "mode" => String, "noCmp" => ("persist" | "memory")?, "category" => String?, "tcfVendorId" => Integer?, "gcmSignal" => ("ad_storage" | "analytics_storage")?, "configured" => bool, "adapters" => Array[::Referalli::Models::get_org_tracking_consent_response_adapters_item] }
+    type get_org_hosted_pages_response_consent = { "adapter" => String, "config" => Hash[String, untyped] }
+    type get_org_hosted_pages_response_chat_option1 = { "adapter" => String, "config" => Hash[String, untyped] }
+    type get_org_hosted_pages_response_served_consent_tags_item = { "tag" => ("script"), "attrs" => Hash[String, (String | bool)], "inline" => String? }
+    type get_org_hosted_pages_response_served_consent_settings_link_option1 = { "call" => String?, "attrs" => Hash[String, String]? }
+    type get_org_hosted_pages_response_served_consent_builtin = { "policyUrl" => String, "text" => Hash[String, String]? }
+    type get_org_hosted_pages_response_served_consent = { "mode" => ("cookiemunch" | "cmp" | "builtin" | "none"), "provider" => String, "tags" => Array[::Referalli::Models::get_org_hosted_pages_response_served_consent_tags_item], "settingsLink" => ::Referalli::Models::get_org_hosted_pages_response_served_consent_settings_link_option1?, "builtin" => ::Referalli::Models::get_org_hosted_pages_response_served_consent_builtin? }
+    type get_org_hosted_pages_response_served_chat_option1_tags_item = { "tag" => ("script"), "attrs" => Hash[String, (String | bool)], "inline" => String? }
+    type get_org_hosted_pages_response_served_chat_option1 = { "provider" => String, "tags" => Array[::Referalli::Models::get_org_hosted_pages_response_served_chat_option1_tags_item] }
+    type get_org_hosted_pages_response_served = { "consent" => ::Referalli::Models::get_org_hosted_pages_response_served_consent, "chat" => ::Referalli::Models::get_org_hosted_pages_response_served_chat_option1?, "csp" => String }
+    type get_org_hosted_pages_response_adapters_consent_item = { "id" => String, "name" => String, "status" => ("ga" | "beta"), "docsUrl" => String, "vendorDocsUrl" => String }
+    type get_org_hosted_pages_response_adapters_chat_item = { "id" => String, "name" => String, "status" => ("ga" | "beta"), "docsUrl" => String, "vendorDocsUrl" => String }
+    type get_org_hosted_pages_response_adapters = { "consent" => Array[::Referalli::Models::get_org_hosted_pages_response_adapters_consent_item], "chat" => Array[::Referalli::Models::get_org_hosted_pages_response_adapters_chat_item] }
+    type get_org_hosted_pages_response = { "consent" => ::Referalli::Models::get_org_hosted_pages_response_consent, "chat" => ::Referalli::Models::get_org_hosted_pages_response_chat_option1?, "customOrigins" => Hash[String, Array[String]], "status" => ("unchecked" | "ok" | "error"), "lastOkAt" => String?, "lastError" => String?, "served" => ::Referalli::Models::get_org_hosted_pages_response_served, "adapters" => ::Referalli::Models::get_org_hosted_pages_response_adapters }
+    type post_org_hosted_pages_check_response_checks_item = { "id" => String, "ok" => bool, "detail" => String, "fix" => String? }
+    type post_org_hosted_pages_check_response = { "ok" => bool, "checks" => Array[::Referalli::Models::post_org_hosted_pages_check_response_checks_item] }
+    type post_webhooks_billing_connection_id_response_results_item = { "duplicate" => bool, "billingEventId" => String?, "conversions" => Integer, "linesCreated" => Integer, "reversals" => Integer, "ignored" => ("filter" | "internal_customer")? }
     type post_webhooks_billing_connection_id_response = { "received" => Integer, "results" => Array[::Referalli::Models::post_webhooks_billing_connection_id_response_results_item] }
     type post_webhooks_auth_connection_id_response_results_item = { "customerRef" => String, "attributed" => bool, "reason" => String?, "partnerId" => String?, "matchedVia" => String? }
     type post_webhooks_auth_connection_id_response = { "received" => Integer, "results" => Array[::Referalli::Models::post_webhooks_auth_connection_id_response_results_item] }
@@ -632,10 +738,20 @@ module Referalli
     type post_webhooks_onchain_connection_id_response = { "received" => Integer, "results" => Array[::Referalli::Models::post_webhooks_onchain_connection_id_response_results_item] }
     type post_webhooks_payouts_provider_response = { "ignored" => bool?, "reason" => String?, "finalized" => bool?, "status" => String? }
     type post_webhooks_stripe_billing_response = { "received" => bool, "duplicate" => bool?, "ignored" => bool?, "reason" => String?, "orgId" => String?, "plan" => String?, "planStatus" => String? }
+    type post_api_privacy_lookup_response = { "subjectId" => String?, "status" => ("found" | "no_match") }
+    type post_api_privacy_requests_response = { "id" => String, "status" => ("pending" | "completed" | "no_match" | "rejected"), "eta" => String?, "detail" => String? }
+    type get_api_privacy_requests_id_response = { "id" => String, "type" => ("access" | "deletion"), "status" => ("pending" | "completed" | "no_match" | "rejected"), "eta" => String?, "detail" => String?, "result" => ::Referalli::Models::get_openapi_json_response? }
+    type post_api_privacy_orgs_org_id_lookup_response = { "subjectId" => String?, "status" => ("found" | "no_match") }
+    type post_api_privacy_orgs_org_id_requests_response = { "id" => String, "status" => ("pending" | "completed" | "no_match" | "rejected"), "detail" => String? }
+    type get_api_privacy_orgs_org_id_requests_id_response = { "id" => String, "type" => ("access" | "deletion"), "status" => ("pending" | "completed" | "no_match" | "rejected"), "detail" => String?, "result" => ::Referalli::Models::post_support_cards_org_id_adapter_response? }
     type get_graphql_response = { "data" => ::Referalli::Models::get_openapi_json_response?, "errors" => Array[::Referalli::Models::get_openapi_json_response]? }
     type post_graphql_response = { "data" => ::Referalli::Models::get_openapi_json_response?, "errors" => Array[::Referalli::Models::get_openapi_json_response]? }
     type post_agents_register_body = { "walletAddress" => String, "nonce" => String, "signature" => String, "name" => String?, "model" => String?, "operator" => String?, "instantPayout" => bool? }
+    type post_auth_backchannel_logout_body = { "logout_token" => String }
     type post_orgs_body = { "name" => String }
+    type put_org_portal_auth_body_option1 = { "adapter" => ("referalli") }
+    type put_org_portal_auth_body_option2 = { "issuer" => String, "clientId" => String, "clientSecret" => String?, "scopes" => String?, "name" => String?, "trustEmailVerified" => bool?, "adapter" => ("oidc"), "autoEnrollProgramId" => String? }
+    type put_org_portal_auth_body_option3 = { "adapter" => ("custom"), "issuer" => String, "jwksUrl" => String, "trustEmailVerified" => bool?, "autoEnrollProgramId" => String?, "name" => String?, "loginUrl" => String? }
     type post_mobile_purchases_body = { "eventId" => String, "customerRef" => String, "type" => ("purchase" | "refund")?, "amountMinor" => Integer, "currency" => String?, "productRef" => String? }
     type patch_org_body = { "name" => String?, "settings" => Hash[String, untyped]?, "payoutKycRequired" => bool? }
     type post_org_members_body = { "email" => String, "role" => ("owner" | "admin" | "finance" | "analyst" | "support") }
@@ -691,7 +807,8 @@ module Referalli
     type post_links_body = { "programId" => String, "partnerId" => String, "code" => String?, "destinationUrl" => String }
     type post_coupons_body = { "programId" => String, "partnerId" => String, "code" => String }
     type post_widget_tokens_body = { "programId" => String, "customerRef" => String?, "partnerExternalRef" => String?, "email" => String?, "displayName" => String?, "ttlSeconds" => Integer? }
-    type post_referrals_associate_body = { "programId" => String, "customerRef" => String, "anonId" => String?, "referralToken" => String?, "couponCode" => String?, "emailHash" => String?, "ip" => String?, "ua" => String?, "idempotencyKey" => String?, "occurredAt" => String?, "emailDomain" => String? }
+    type post_referrals_associate_body_consent = { "provider" => String, "state" => ("granted" | "denied" | "unknown"), "at" => String?, "stamp" => String?, "tcString" => String?, "gppString" => String?, "purposes" => Array[String]? }
+    type post_referrals_associate_body = { "programId" => String, "customerRef" => String, "anonId" => String?, "referralToken" => String?, "couponCode" => String?, "emailHash" => String?, "ip" => String?, "ua" => String?, "idempotencyKey" => String?, "occurredAt" => String?, "emailDomain" => String?, "consent" => ::Referalli::Models::post_referrals_associate_body_consent? }
     type patch_referrals_id_body = { "status" => ("paused" | "active") }
     type post_referrals_id_reassign_body = { "partnerId" => String }
     type post_attribution_replay_body = { "programId" => String }
@@ -718,13 +835,16 @@ module Referalli
     type post_commission_rules_body = { "programId" => String, "config" => ::Referalli::Models::post_commission_rules_body_config }
     type post_commissions_id_adjust_body = { "amountMinor" => Integer, "memo" => String, "allowNegative" => bool? }
     type post_commissions_id_settle_body = { "method" => ("store_credit")?, "reference" => String, "memo" => String? }
-    type post_billing_connections_body = { "provider" => ("stripe" | "paddle" | "lemonsqueezy" | "polar" | "chargebee" | "shopify" | "generic" | "recurly" | "braintree" | "woocommerce" | "bigcommerce"), "name" => String?, "webhookSecret" => String? }
+    type post_billing_connections_body_filter = { "metadata" => Hash[String, String]?, "productIds" => Array[String]?, "priceIds" => Array[String]?, "skus" => Array[String]? }
+    type post_billing_connections_body = { "provider" => ("stripe" | "paddle" | "lemonsqueezy" | "polar" | "chargebee" | "shopify" | "generic" | "recurly" | "braintree" | "woocommerce" | "bigcommerce"), "name" => String?, "webhookSecret" => String?, "filter" => ::Referalli::Models::post_billing_connections_body_filter? }
     type put_billing_connections_id_secret_body = { "webhookSecret" => String }
     type put_billing_connections_id_credentials_body = { "apiKey" => String?, "apiToken" => String?, "storeHash" => String?, "region" => ("us" | "eu")? }
-    type patch_billing_connections_id_body = { "status" => ("active" | "paused")?, "name" => String? }
+    type patch_billing_connections_id_body_filter_option1 = { "metadata" => Hash[String, String]?, "productIds" => Array[String]?, "priceIds" => Array[String]?, "skus" => Array[String]? }
+    type patch_billing_connections_id_body = { "status" => ("active" | "paused")?, "name" => String?, "filter" => ::Referalli::Models::patch_billing_connections_id_body_filter_option1? }
     type put_billing_connections_id_value_mapping_body = { "cash" => String?, "creditApplied" => String?, "discount" => String?, "cost" => String?, "productRef" => String?, "unit" => ("minor" | "major") }
     type post_billing_connections_id_value_mapping_preview_body_mapping = { "cash" => String?, "creditApplied" => String?, "discount" => String?, "cost" => String?, "productRef" => String?, "unit" => ("minor" | "major") }
     type post_billing_connections_id_value_mapping_preview_body = { "payload" => untyped, "currency" => String?, "mapping" => ::Referalli::Models::post_billing_connections_id_value_mapping_preview_body_mapping? }
+    type post_billing_internal_customers_body = { "customerRef" => String, "note" => String? }
     type put_partners_id_payout_profile_body = { "method" => ("paypal" | "wise" | "stripe_connect" | "ach" | "crypto" | "payoneer" | "tremendous" | "csv"), "details" => Hash[String, untyped]?, "payoutCurrency" => String?, "minThresholdMinor" => Integer? }
     type patch_partners_id_payout_profile_body = { "minThresholdMinor" => Integer }
     type post_partners_id_tax_form_body = { "type" => ("w9" | "w8ben" | "w8bene"), "data" => untyped }
@@ -742,15 +862,16 @@ module Referalli
     type put_profitability_settings_body = { "reportingCurrency" => String?, "defaultMarginBps" => Integer?, "creditCostModel" => ("face" | "margin" | "fixed_ratio")?, "creditCostRatioBps" => Integer?, "inference" => ("fifo_next_payments" | "report_only" | "on_grant")?, "creditDraw" => ("grants_first" | "pro_rata")?, "windowDays" => Integer?, "churnWindowDays" => Integer?, "countReferrerSpend" => bool?, "costToServeMinorPerMonth" => Integer?, "taxFeesReduceProfit" => bool?, "valuePatternWeight" => Numeric?, "targetRoiBps" => Integer?, "programId" => String? }
     type put_profitability_products_product_ref_body = { "marginBps" => Integer?, "unitCostMinor" => Integer?, "currency" => String? }
     type post_roi_patterns_pattern_review_body = { "customerRef" => String?, "partnerId" => String?, "programId" => String? }
-    type post_value_events_body = { "events" => Array[untyped] }
+    type post_value_events_body_events_item = { "kind" => ("payment" | "refund" | "credit_granted" | "credit_redeemed" | "credit_expired" | "credit_revoked" | "cost" | "adjustment"), "customerRef" => String?, "partnerId" => String?, "partnerExternalRef" => String?, "creditGrantId" => String?, "referralId" => String?, "programId" => String?, "productRef" => String?, "currency" => String, "cashMinor" => Integer?, "creditAppliedMinor" => Integer?, "discountMinor" => Integer?, "taxMinor" => Integer?, "feesMinor" => Integer?, "costMinor" => Integer?, "faceMinor" => Integer?, "externalId" => String, "invoiceRef" => String?, "provider" => String?, "occurredAt" => String, "role" => ("referee" | "referrer")?, "metadata" => Hash[String, untyped]? }
+    type post_value_events_body = { "events" => Array[::Referalli::Models::post_value_events_body_events_item] }
     type post_value_import_body = { "csv" => String, "mapping" => Hash[String, ("kind" | "customerRef" | "partnerId" | "partnerExternalRef" | "creditGrantId" | "referralId" | "programId" | "productRef" | "currency" | "externalId" | "invoiceRef" | "provider" | "occurredAt" | "role" | "cashMinor" | "creditAppliedMinor" | "discountMinor" | "taxMinor" | "feesMinor" | "costMinor" | "faceMinor" | "cashMajor" | "creditAppliedMajor" | "discountMajor" | "taxMajor" | "feesMajor" | "costMajor" | "faceMajor")], "kind" => ("payment" | "refund" | "credit_granted" | "credit_redeemed" | "credit_expired" | "credit_revoked" | "cost" | "adjustment")?, "dryRun" => bool?, "defaultCurrency" => String? }
     type post_partner_kyc_submit_body = { "legalName" => String, "country" => String, "dateOfBirth" => String?, "documentRef" => String? }
     type post_partner_links_body = { "orgId" => String, "programId" => String, "destinationUrl" => String, "assetId" => String?, "code" => String? }
     type post_partner_disputes_body = { "orgId" => String, "referralId" => String?, "kind" => ("missing_attribution" | "unpaid_commission"), "detail" => String }
     type put_partner_orgs_org_id_payout_profile_body = { "method" => ("paypal" | "wise" | "stripe_connect" | "ach" | "crypto" | "payoneer" | "tremendous" | "csv"), "details" => Hash[String, untyped]?, "payoutCurrency" => String? }
     type post_partner_orgs_org_id_tax_form_body = { "type" => ("w9" | "w8ben" | "w8bene"), "data" => untyped }
-    type post_webhook_endpoints_body = { "url" => String, "topics" => Array[String]?, "legacySignature" => bool?, "programIds" => Array[String]? }
-    type patch_webhook_endpoints_id_body = { "status" => ("active" | "paused")?, "url" => String?, "topics" => Array[String]?, "legacySignature" => bool?, "programIds" => Array[String]? }
+    type post_webhook_endpoints_body = { "url" => String, "topics" => Array[String]?, "legacySignature" => bool?, "programIds" => Array[String]?, "alertContacts" => Array[String]? }
+    type patch_webhook_endpoints_id_body = { "status" => ("active" | "paused")?, "url" => String?, "topics" => Array[String]?, "legacySignature" => bool?, "programIds" => Array[String]?, "alertContacts" => Array[String]? }
     type post_sandbox_simulate_body = { "programId" => String, "partnerId" => String, "scenario" => ("subscription" | "refund" | "churn")?, "priceMinor" => Integer?, "months" => Integer? }
     type post_import_provider_body = { "csv" => String }
     type put_branding_body = { "logoUrl" => String?, "theme" => Hash[String, String]?, "emailFrom" => String? }
@@ -771,8 +892,10 @@ module Referalli
     type post_billing_checkout_body = { "plan" => ("growth" | "pro" | "scale") }
     type post_billing_activate_body = { "plan" => ("free" | "growth" | "pro" | "scale" | "starter") }
     type put_programs_id_referee_reward_body = { "enabled" => bool?, "kind" => ("store_credit" | "coupon" | "gift_card")?, "amountMinor" => Integer?, "bps" => Integer?, "capMinor" => Integer?, "on" => ("first_commission" | "first_payment")?, "rounding" => ("half_even" | "floor")?, "currency" => String? }
+    type post_rewards_body = { "partnerId" => String?, "partnerExternalRef" => String?, "reason" => String, "amountMinor" => Integer?, "currency" => String?, "ruleKey" => String?, "event" => String?, "programId" => String?, "idempotencyKey" => String }
     type post_rewards_redeem_by_code_body = { "amountMinor" => Integer?, "billingEventId" => String?, "invoiceRef" => String?, "externalId" => String?, "occurredAt" => untyped?, "code" => String }
     type post_rewards_id_redeem_body = { "amountMinor" => Integer?, "billingEventId" => String?, "invoiceRef" => String?, "externalId" => String?, "occurredAt" => untyped? }
+    type put_rewards_rules_key_body = { "event" => String?, "programId" => String?, "amountMinor" => Integer, "currency" => String?, "reason" => String, "enabled" => bool? }
     type post_programs_id_groups_body_base_option1_option1 = { "kind" => ("percent"), "bps" => Integer }
     type post_programs_id_groups_body_base_option1_option2 = { "kind" => ("fixed"), "amountMinor" => Integer, "currency" => String }
     type post_programs_id_groups_body = { "name" => String, "base" => (::Referalli::Models::post_programs_id_groups_body_base_option1_option1 | ::Referalli::Models::post_programs_id_groups_body_base_option1_option2)?, "holdDays" => Integer?, "minThresholdMinor" => Integer?, "payoutCurrency" => String?, "onboardingMessage" => String?, "onboardingChecklist" => Array[String]? }
@@ -809,8 +932,8 @@ module Referalli
     type put_email_settings_body = { "provider" => ("resend" | "brevo" | "postmark")?, "apiKey" => String?, "fromAddress" => String?, "fromName" => String?, "replyTo" => String?, "defaultLocale" => ("en" | "es" | "de" | "fr" | "pt" | "it" | "nl" | "sv" | "ja" | "zh")?, "logoUrl" => String?, "primaryColor" => String? }
     type put_email_templates_event_locale_body = { "subject" => String, "text" => String, "html" => String? }
     type post_email_preview_body_draft = { "subject" => String, "text" => String, "html" => String? }
-    type post_email_preview_body = { "event" => ("payout_sent" | "payout_failed" | "invitation_received" | "partner_approved" | "contract_sent" | "webhook_endpoint_disabled" | "tax_document_ready"), "locale" => ("en" | "es" | "de" | "fr" | "pt" | "it" | "nl" | "sv" | "ja" | "zh"), "draft" => ::Referalli::Models::post_email_preview_body_draft? }
-    type post_email_test_body = { "event" => ("payout_sent" | "payout_failed" | "invitation_received" | "partner_approved" | "contract_sent" | "webhook_endpoint_disabled" | "tax_document_ready"), "locale" => ("en" | "es" | "de" | "fr" | "pt" | "it" | "nl" | "sv" | "ja" | "zh"), "to" => String }
+    type post_email_preview_body = { "event" => ("payout_sent" | "payout_failed" | "invitation_received" | "partner_approved" | "contract_sent" | "webhook_endpoint_disabled" | "webhook_endpoint_failing" | "tax_document_ready"), "locale" => ("en" | "es" | "de" | "fr" | "pt" | "it" | "nl" | "sv" | "ja" | "zh"), "draft" => ::Referalli::Models::post_email_preview_body_draft? }
+    type post_email_test_body = { "event" => ("payout_sent" | "payout_failed" | "invitation_received" | "partner_approved" | "contract_sent" | "webhook_endpoint_disabled" | "webhook_endpoint_failing" | "tax_document_ready"), "locale" => ("en" | "es" | "de" | "fr" | "pt" | "it" | "nl" | "sv" | "ja" | "zh"), "to" => String }
     type put_me_locale_body = { "locale" => ("en" | "es" | "de" | "fr" | "pt" | "it" | "nl" | "sv" | "ja" | "zh") }
     type put_me_roi_digest_body = { "enabled" => bool }
     type put_partner_locale_body = { "locale" => ("en" | "es" | "de" | "fr" | "pt" | "it" | "nl" | "sv" | "ja" | "zh") }
@@ -822,21 +945,37 @@ module Referalli
     type post_partner_security_totp_enable_body = { "code" => String }
     type post_partner_security_totp_disable_body = { "code" => String }
     type post_auth_connections_body_keys = { "referralToken" => String?, "anonId" => String?, "couponCode" => String?, "programId" => String?, "autoEnroll" => String? }
-    type post_auth_connections_body = { "provider" => ("clerk" | "supabase" | "workos" | "generic" | "atlas" | "custom"), "programId" => String, "instanceId" => String?, "autoEnrollUsers" => bool?, "destinationUrl" => String?, "name" => String?, "secret" => String?, "keys" => ::Referalli::Models::post_auth_connections_body_keys? }
+    type post_auth_connections_body = { "provider" => ("atlas" | "clerk" | "auth0" | "supabase" | "firebase" | "cognito" | "stytch" | "kinde" | "workos" | "generic" | "custom"), "programId" => String, "instanceId" => String?, "autoEnrollUsers" => bool?, "destinationUrl" => String?, "name" => String?, "secret" => String?, "keys" => ::Referalli::Models::post_auth_connections_body_keys? }
+    type put_auth_connections_id_secret_body = { "secret" => String }
     type patch_auth_connections_id_body = { "status" => ("active" | "paused")?, "name" => String?, "autoEnrollUsers" => bool?, "destinationUrl" => String?, "signatureVersion" => ("v1+v2" | "v2")? }
     type post_auth_connections_id_signups_body_referral = { "code" => String?, "clickId" => String?, "anonId" => String?, "capturedAt" => String?, "consent" => ("granted" | "not_required")? }
     type post_auth_connections_id_signups_body_risk = { "botScore" => Numeric?, "disposableEmail" => bool?, "emailVerified" => bool?, "selfReferral" => bool?, "velocity" => Integer?, "reasons" => Array[String]?, "score" => Numeric?, "level" => ("low" | "medium" | "high")?, "dropped" => bool? }
     type post_auth_connections_id_signups_body = { "customerRef" => String, "email" => String?, "emailHash" => String?, "name" => String?, "ip" => String?, "ua" => String?, "signedUpAt" => String, "referral" => ::Referalli::Models::post_auth_connections_id_signups_body_referral?, "risk" => ::Referalli::Models::post_auth_connections_id_signups_body_risk?, "emailDomain" => String?, "referralCode" => String?, "autoEnroll" => bool?, "test" => bool? }
+    type post_auth_connections_id_partners_body = { "customerRef" => String, "email" => String, "name" => String?, "code" => String? }
     type post_auth_connections_id_erase_body = { "customerRef" => String }
     type post_auth_connections_id_aliases_body = { "fromCustomerRef" => String, "toCustomerRef" => String }
     type post_auth_connections_id_users_body = { "customerRef" => String, "email" => String?, "name" => String?, "status" => ("active" | "suspended" | "deleted")? }
     type post_auth_connections_id_signals_body = { "customerRef" => String, "signal" => ("email_verified" | "banned" | "unbanned" | "fraud_confirmed" | "self_referral"), "at" => String?, "details" => Hash[String, untyped]? }
+    type post_auth_connections_install_body = { "clientId" => String, "scope" => String, "redirectUri" => String, "state" => String?, "codeChallenge" => String, "instanceId" => String, "programId" => String?, "decision" => ("allow" | "deny") }
+    type post_oauth_token_body = { "grant_type" => ("authorization_code"), "code" => String, "code_verifier" => String, "client_id" => String, "redirect_uri" => String }
     type patch_org_sso_body = { "requireSso" => bool?, "roleMapping" => Hash[String, ("owner" | "admin" | "finance" | "analyst" | "support")]? }
     type post_org_sso_tickets_body = { "expiresInDays" => Integer? }
+    type put_org_sso_direct_body_option1 = { "adapter" => ("oidc"), "issuer" => String, "clientId" => String, "clientSecret" => String?, "scopes" => String?, "roleClaim" => String?, "name" => String?, "domains" => Array[String]?, "roleMapping" => Hash[String, ("admin" | "finance" | "analyst" | "support")]?, "defaultRole" => ("admin" | "finance" | "analyst" | "support")?, "trustEmailVerified" => bool? }
+    type put_org_sso_direct_body_option2 = { "adapter" => ("workos"), "clientId" => String, "apiKey" => String?, "organizationId" => String, "domains" => Array[String]?, "roleMapping" => Hash[String, ("admin" | "finance" | "analyst" | "support")]?, "defaultRole" => ("admin" | "finance" | "analyst" | "support")?, "trustEmailVerified" => bool? }
     type post_partner_auth_wallet_nonce_body = { "address" => String }
     type post_partner_auth_wallet_verify_body = { "address" => String, "nonce" => String, "signature" => String, "name" => String? }
     type post_onchain_connections_body = { "programId" => String, "name" => String?, "secret" => String?, "decimals" => Hash[String, Integer]? }
     type post_public_programs_handle_join_body = { "destinationUrl" => String? }
+    type put_support_apps_adapter_body_config = { "publicKeyPem" => String?, "subdomain" => String?, "cardKey" => String? }
+    type put_support_apps_adapter_body = { "enabled" => bool?, "secret" => String?, "rotate" => bool?, "config" => ::Referalli::Models::put_support_apps_adapter_body_config? }
+    type post_support_apps_adapter_test_body = { "email" => String?, "customerRef" => String?, "partnerExternalRef" => String?, "ext" => String? }
+    type post_privacy_executor_keys_body_config = { "publicKeyPem" => String?, "algorithm" => ("ES384" | "ES256" | "RS256")?, "sombraUrl" => String? }
+    type post_privacy_executor_keys_body = { "adapter" => ("cm-standard-v1" | "onetrust" | "transcend" | "datagrail" | "ketch" | "osano" | "custom"), "vendorSecret" => String?, "config" => ::Referalli::Models::post_privacy_executor_keys_body_config?, "rotate" => bool?, "enabled" => bool? }
+    type post_account_close_body = { "confirm" => String }
+    type put_org_tracking_consent_body = { "mode" => ("auto" | "none" | "pending" | "custom" | "cookiemunch" | "onetrust" | "cookiebot" | "usercentrics" | "didomi" | "osano" | "termly" | "tcf" | "gpp" | "gcm"), "category" => String?, "tcfVendorId" => Integer?, "gcmSignal" => ("ad_storage" | "analytics_storage")?, "noCmp" => ("persist" | "memory")? }
+    type put_org_hosted_pages_body_consent = { "adapter" => ("none" | "builtin" | "cookiemunch" | "onetrust" | "cookiebot" | "usercentrics" | "didomi" | "osano" | "termly" | "iubenda" | "custom"), "config" => Hash[String, untyped]? }
+    type put_org_hosted_pages_body_chat_option1 = { "adapter" => ("chatly" | "intercom" | "crisp" | "custom"), "config" => Hash[String, untyped]? }
+    type put_org_hosted_pages_body = { "consent" => ::Referalli::Models::put_org_hosted_pages_body_consent, "chat" => ::Referalli::Models::put_org_hosted_pages_body_chat_option1?, "customOrigins" => Hash[String, Array[String]]? }
     type post_graphql_body = { "query" => String, "variables" => Hash[String, untyped]?, "operationName" => String? }
   end
 
@@ -846,15 +985,20 @@ module Referalli
     def delete_assets_id: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
     def delete_auth_connections_id: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
     def delete_billing_connections_id: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
+    def delete_billing_internal_customers_customer_ref: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
     def delete_branding_domain: (?idempotency_key: String) -> ::Referalli::Models::ok
     def delete_branding_link_domain: (?idempotency_key: String) -> ::Referalli::Models::ok
     def delete_cli_listeners_id: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
     def delete_email_templates_event_locale: (String, String, ?idempotency_key: String) -> ::Referalli::Models::delete_email_templates_event_locale_response
     def delete_integrations_kind: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
     def delete_org_members_user_id: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
+    def delete_org_sso_direct: (?idempotency_key: String) -> ::Referalli::Models::delete_org_sso_direct_response
     def delete_partners_id: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
     def delete_payout_connections_provider: (String, ?idempotency_key: String) -> ::Referalli::Models::delete_payout_connections_provider_response
+    def delete_privacy_executors_adapter: (String, ?idempotency_key: String) -> ::Referalli::Models::delete_privacy_executors_adapter_response
     def delete_profitability_products_product_ref: (String, ?idempotency_key: String) -> ::Referalli::Models::ok_status
+    def delete_rewards_rules_key: (String, ?idempotency_key: String) -> ::Referalli::Models::delete_rewards_rules_key_response
+    def delete_support_apps_adapter: (String, ?idempotency_key: String) -> ::Referalli::Models::delete_support_apps_adapter_response
     def delete_webhook_endpoints_id: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
     def delete_zapier_hooks_id: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
     def get_admin_metrics: (?idempotency_key: String) -> ::Referalli::Models::get_admin_metrics_response
@@ -889,16 +1033,21 @@ module Referalli
     def get_auth_connections: (?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::auth_connection]
     def get_auth_connections_each: (?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::auth_connection) -> void } -> Enumerator[::Referalli::Models::auth_connection, void]
     def get_auth_connections_id_export: (String, customer_ref: String, ?idempotency_key: String) -> ::Referalli::Models::get_auth_connections_id_export_response
+    def get_auth_connections_providers: (?idempotency_key: String) -> ::Referalli::Models::get_auth_connections_providers_response
     def get_auth_providers: (?idempotency_key: String) -> ::Referalli::Models::get_auth_providers_response
     def get_billing_connections: (?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::billing_connection]
     def get_billing_connections_each: (?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::billing_connection) -> void } -> Enumerator[::Referalli::Models::billing_connection, void]
     def get_billing_connections_id: (String, ?idempotency_key: String) -> ::Referalli::Models::billing_connection
-    def get_billing_events: (?customer_ref: String, ?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::billing_event]
-    def get_billing_events_each: (?customer_ref: String, ?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::billing_event) -> void } -> Enumerator[::Referalli::Models::billing_event, void]
+    def get_billing_events: (?customer_ref: String, ?status: ("processed" | "ignored_by_filter"), ?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::billing_event]
+    def get_billing_events_each: (?customer_ref: String, ?status: ("processed" | "ignored_by_filter"), ?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::billing_event) -> void } -> Enumerator[::Referalli::Models::billing_event, void]
+    def get_billing_internal_customers: (?idempotency_key: String) -> Array[::Referalli::Models::internal_customer]
     def get_billing_plan: (?idempotency_key: String) -> ::Referalli::Models::get_billing_plan_response
     def get_branding: (?idempotency_key: String) -> ::Referalli::Models::get_branding_response
+    def get_chatly_identity: (?idempotency_key: String) -> ::Referalli::Models::get_chatly_identity_response
     def get_cleanroom_consent: (customer_ref: String, ?idempotency_key: String) -> ::Referalli::Models::get_cleanroom_consent_response
     def get_cleanroom_query: (dimension: String, ?idempotency_key: String) -> ::Referalli::Models::get_cleanroom_query_response
+    def get_clicks_consent_coverage: (?days: Integer, ?idempotency_key: String) -> ::Referalli::Models::get_clicks_consent_coverage_response
+    def get_clicks_id: (String, ?idempotency_key: String) -> ::Referalli::Models::get_clicks_id_response
     def get_cli_device_codes_user_code: (String, ?idempotency_key: String) -> ::Referalli::Models::get_cli_device_codes_user_code_response
     def get_cli_listeners_id_events: (String, ?wait: Integer, ?idempotency_key: String) -> ::Referalli::Models::get_cli_listeners_id_events_response
     def get_cli_logs: (?after: Integer, ?wait: Integer, ?limit: Integer, ?idempotency_key: String) -> ::Referalli::Models::get_cli_logs_response
@@ -922,7 +1071,9 @@ module Referalli
     def get_email_settings: (?idempotency_key: String) -> ::Referalli::Models::email_settings
     def get_email_templates: (?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::email_template_event]
     def get_email_templates_each: (?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::email_template_event) -> void } -> Enumerator[::Referalli::Models::email_template_event, void]
+    def get_embed: (token: String, ?idempotency_key: String) -> ::Referalli::Models::get_well_known_forgedeck_embed_json_response
     def get_embed_summary: (?idempotency_key: String) -> ::Referalli::Models::get_embed_summary_response
+    def get_events: (?since: String, ?topics: String, ?after: String, ?limit: Integer, ?idempotency_key: String) -> ::Referalli::Models::get_events_response
     def get_export_accounting: (?format: ("quickbooks" | "xero"), year: Integer, ?idempotency_key: String) -> String
     def get_export_full: (?idempotency_key: String) -> String
     def get_fraud_cases: (?status: ("open" | "dismissed" | "actioned"), ?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::fraud_case]
@@ -934,6 +1085,7 @@ module Referalli
     def get_hosts_current: (?idempotency_key: String) -> ::Referalli::Models::get_hosts_current_response
     def get_hosts_current_theme_css: (?idempotency_key: String) -> String
     def get_incrementality: (program_id: String, ?idempotency_key: String) -> ::Referalli::Models::get_incrementality_response
+    def get_integration_health: (?idempotency_key: String) -> ::Referalli::Models::get_integration_health_response
     def get_integrations: (?idempotency_key: String) -> ::Referalli::Models::get_integrations_response
     def get_integrations_deliveries: (?kind: ("zapier" | "hubspot" | "segment"), ?status: ("pending" | "sent" | "failed" | "skipped"), ?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::integration_delivery]
     def get_integrations_deliveries_each: (?kind: ("zapier" | "hubspot" | "segment"), ?status: ("pending" | "sent" | "failed" | "skipped"), ?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::integration_delivery) -> void } -> Enumerator[::Referalli::Models::integration_delivery, void]
@@ -957,14 +1109,17 @@ module Referalli
     def get_openapi_yaml: (?idempotency_key: String) -> String
     def get_org: (?idempotency_key: String) -> ::Referalli::Models::org
     def get_org_fx_feed: (?idempotency_key: String) -> ::Referalli::Models::get_org_fx_feed_response
+    def get_org_hosted_pages: (?idempotency_key: String) -> ::Referalli::Models::get_org_hosted_pages_response
     def get_org_members: (?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::member]
     def get_org_members_each: (?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::member) -> void } -> Enumerator[::Referalli::Models::member, void]
     def get_org_payout_schedule: (?idempotency_key: String) -> ::Referalli::Models::get_org_payout_schedule_response
+    def get_org_portal_auth: (?idempotency_key: String) -> ::Referalli::Models::get_org_portal_auth_response
     def get_org_referral_params: (?idempotency_key: String) -> ::Referalli::Models::get_org_referral_params_response
     def get_org_retention: (?idempotency_key: String) -> ::Referalli::Models::retention
     def get_org_sso: (?idempotency_key: String) -> ::Referalli::Models::get_org_sso_response
     def get_org_sso_connections_id_saml_metadata: (String, ?idempotency_key: String) -> ::Referalli::Models::get_org_sso_connections_id_saml_metadata_response
     def get_org_tax_profile: (?idempotency_key: String) -> ::Referalli::Models::tax_profile
+    def get_org_tracking_consent: (?idempotency_key: String) -> ::Referalli::Models::get_org_tracking_consent_response
     def get_outreach: (?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::get_outreach_response_data_item]
     def get_outreach_each: (?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::get_outreach_response_data_item) -> void } -> Enumerator[::Referalli::Models::get_outreach_response_data_item, void]
     def get_partner_achievements: (?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::get_partner_achievements_response_data_item]
@@ -1032,6 +1187,10 @@ module Referalli
     def get_payouts: (?partner_id: String, ?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::payout]
     def get_payouts_each: (?partner_id: String, ?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::payout) -> void } -> Enumerator[::Referalli::Models::payout, void]
     def get_payouts_id_invoice: (String, ?format: ("json" | "html"), ?idempotency_key: String) -> ::Referalli::Models::invoice
+    def get_plans: (?idempotency_key: String) -> ::Referalli::Models::get_plans_response
+    def get_portal_auth_current: (?org: String, ?idempotency_key: String) -> ::Referalli::Models::get_portal_auth_current_response
+    def get_privacy_executor_requests: (?idempotency_key: String) -> ::Referalli::Models::get_privacy_executor_requests_response
+    def get_privacy_executors: (?idempotency_key: String) -> ::Referalli::Models::get_privacy_executors_response
     def get_privacy_export: (customer_ref: String, ?idempotency_key: String) -> ::Referalli::Models::customer_export
     def get_privacy_requests: (?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::privacy_request]
     def get_privacy_requests_each: (?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::privacy_request) -> void } -> Enumerator[::Referalli::Models::privacy_request, void]
@@ -1068,7 +1227,9 @@ module Referalli
     def get_reports_partner_performance: (?format: ("json" | "csv"), ?idempotency_key: String) -> ::Referalli::Models::get_reports_partner_performance_response
     def get_rewards: (?status: ("issued" | "redeemed" | "void"), ?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::get_rewards_response_data_item]
     def get_rewards_each: (?status: ("issued" | "redeemed" | "void"), ?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::get_rewards_response_data_item) -> void } -> Enumerator[::Referalli::Models::get_rewards_response_data_item, void]
+    def get_rewards_granted: (?idempotency_key: String) -> ::Referalli::Models::get_rewards_granted_response
     def get_rewards_lookup_code: (String, ?idempotency_key: String) -> ::Referalli::Models::get_rewards_lookup_code_response
+    def get_rewards_rules: (?idempotency_key: String) -> Array[::Referalli::Models::put_rewards_rules_key_response]
     def get_roi_breakdown: (?from: String, ?to: String, ?program_id: String, ?partner_id: String, ?window_days: Integer, ?currency: String, ?format: ("json" | "csv"), by: ("program" | "partner" | "cohort" | "source" | "role"), ?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::get_roi_breakdown_response_data_item]
     def get_roi_breakdown_each: (?from: String, ?to: String, ?program_id: String, ?partner_id: String, ?window_days: Integer, ?currency: String, ?format: ("json" | "csv"), by: ("program" | "partner" | "cohort" | "source" | "role"), ?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::get_roi_breakdown_response_data_item) -> void } -> Enumerator[::Referalli::Models::get_roi_breakdown_response_data_item, void]
     def get_roi_data_quality: (?from: String, ?to: String, ?format: ("json" | "csv"), ?idempotency_key: String) -> ::Referalli::Models::get_roi_data_quality_response
@@ -1086,6 +1247,9 @@ module Referalli
     def get_status_incidents_each: (?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::incident) -> void } -> Enumerator[::Referalli::Models::incident, void]
     def get_status_incidents_atom: (?idempotency_key: String) -> String
     def get_status_incidents_id: (String, ?idempotency_key: String) -> ::Referalli::Models::incident
+    def get_support_apps: (?idempotency_key: String) -> ::Referalli::Models::get_support_apps_response
+    def get_support_cards_org_id_adapter: (String, String, ?email: String, ?external_id: String, ?idempotency_key: String) -> ::Referalli::Models::post_support_cards_org_id_adapter_response
+    def get_support_context: (?email: String, ?customer_ref: String, ?partner_external_ref: String, ?ext: String, ?idempotency_key: String) -> ::Referalli::Models::get_support_context_response
     def get_tax1099: (year: Integer, ?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::get_tax1099_response_data_item]
     def get_tax1099_each: (year: Integer, ?limit: Integer, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) ?{ (::Referalli::Models::get_tax1099_response_data_item) -> void } -> Enumerator[::Referalli::Models::get_tax1099_response_data_item, void]
     def get_tax1099_filings: (year: Integer, ?limit: Integer, ?starting_after: String, ?ending_before: String, ?created_gte: String, ?created_lte: String, ?idempotency_key: String) -> ::Referalli::page[::Referalli::Models::get_tax1099_filings_response_data_item]
@@ -1120,7 +1284,8 @@ module Referalli
     def patch_partners_id_payout_profile: (String, ::Referalli::Models::patch_partners_id_payout_profile_body, ?idempotency_key: String) -> ::Referalli::Models::patch_partners_id_payout_profile_response
     def patch_programs_id: (String, ::Referalli::Models::patch_programs_id_body, ?idempotency_key: String) -> ::Referalli::Models::program
     def patch_referrals_id: (String, ::Referalli::Models::patch_referrals_id_body, ?idempotency_key: String) -> ::Referalli::Models::referral
-    def patch_webhook_endpoints_id: (String, ::Referalli::Models::patch_webhook_endpoints_id_body, ?idempotency_key: String) -> ::Referalli::Models::webhook_endpoint
+    def patch_webhook_endpoints_id: (String, ::Referalli::Models::patch_webhook_endpoints_id_body, ?idempotency_key: String) -> ::Referalli::Models::patch_webhook_endpoints_id_response
+    def post_account_close: (::Referalli::Models::post_account_close_body, ?idempotency_key: String) -> ::Referalli::Models::post_account_close_response
     def post_admin_orgs_id_plan: (String, ::Referalli::Models::post_admin_orgs_id_plan_body, ?idempotency_key: String) -> ::Referalli::Models::post_admin_orgs_id_plan_response
     def post_admin_orgs_id_suspend: (String, ::Referalli::Models::post_admin_orgs_id_suspend_body, ?idempotency_key: String) -> ::Referalli::Models::post_admin_orgs_id_suspend_response
     def post_admin_orgs_id_unsuspend: (String, ?idempotency_key: String) -> ::Referalli::Models::post_admin_orgs_id_unsuspend_response
@@ -1133,21 +1298,25 @@ module Referalli
     def post_api_keys: (::Referalli::Models::post_api_keys_body, ?idempotency_key: String) -> ::Referalli::Models::post_api_keys_response
     def post_assets: (::Referalli::Models::post_assets_body, ?idempotency_key: String) -> ::Referalli::Models::post_assets_response
     def post_attribution_replay: (::Referalli::Models::post_attribution_replay_body, ?idempotency_key: String) -> ::Referalli::Models::post_attribution_replay_response
+    def post_auth_backchannel_logout: (::Referalli::Models::post_auth_backchannel_logout_body, ?idempotency_key: String) -> ::Referalli::Models::post_auth_backchannel_logout_response
     def post_auth_connections: (::Referalli::Models::post_auth_connections_body, ?idempotency_key: String) -> ::Referalli::Models::created_auth_connection
     def post_auth_connections_id_aliases: (String, ::Referalli::Models::post_auth_connections_id_aliases_body, ?idempotency_key: String) -> ::Referalli::Models::post_auth_connections_id_aliases_response
     def post_auth_connections_id_erase: (String, ::Referalli::Models::post_auth_connections_id_erase_body, ?idempotency_key: String) -> ::Referalli::Models::post_auth_connections_id_erase_response
+    def post_auth_connections_id_partners: (String, ::Referalli::Models::post_auth_connections_id_partners_body, ?idempotency_key: String) -> ::Referalli::Models::post_auth_connections_id_partners_response
     def post_auth_connections_id_ping: (String, Hash[String, untyped], ?idempotency_key: String) -> ::Referalli::Models::post_auth_connections_id_ping_response
     def post_auth_connections_id_revoke_previous_secret: (String, ?idempotency_key: String) -> ::Referalli::Models::post_auth_connections_id_revoke_previous_secret_response
     def post_auth_connections_id_rotate_secret: (String, ?idempotency_key: String) -> ::Referalli::Models::post_auth_connections_id_rotate_secret_response
     def post_auth_connections_id_signals: (String, ::Referalli::Models::post_auth_connections_id_signals_body, ?idempotency_key: String) -> ::Referalli::Models::post_auth_connections_id_signals_response
     def post_auth_connections_id_signups: (String, ::Referalli::Models::post_auth_connections_id_signups_body, ?idempotency_key: String) -> ::Referalli::Models::post_auth_connections_id_signups_response
     def post_auth_connections_id_users: (String, ::Referalli::Models::post_auth_connections_id_users_body, ?idempotency_key: String) -> ::Referalli::Models::post_auth_connections_id_users_response
+    def post_auth_connections_install: (::Referalli::Models::post_auth_connections_install_body, ?idempotency_key: String) -> ::Referalli::Models::post_auth_connections_install_response
     def post_auth_logout: (?idempotency_key: String) -> ::Referalli::Models::post_auth_logout_response
     def post_billing_activate: (::Referalli::Models::post_billing_activate_body, ?idempotency_key: String) -> ::Referalli::Models::post_billing_activate_response
     def post_billing_checkout: (::Referalli::Models::post_billing_checkout_body, ?idempotency_key: String) -> ::Referalli::Models::post_billing_checkout_response
     def post_billing_connections: (::Referalli::Models::post_billing_connections_body, ?idempotency_key: String) -> ::Referalli::Models::created_billing_connection
     def post_billing_connections_id_rotate_secret: (String, ?idempotency_key: String) -> ::Referalli::Models::post_billing_connections_id_rotate_secret_response
     def post_billing_connections_id_value_mapping_preview: (String, ::Referalli::Models::post_billing_connections_id_value_mapping_preview_body, ?idempotency_key: String) -> ::Referalli::Models::value_mapping_preview
+    def post_billing_internal_customers: (::Referalli::Models::post_billing_internal_customers_body, ?idempotency_key: String) -> ::Referalli::Models::post_billing_internal_customers_response
     def post_billing_portal: (?idempotency_key: String) -> ::Referalli::Models::post_billing_portal_response
     def post_branding_domain: (::Referalli::Models::post_branding_domain_body, ?idempotency_key: String) -> ::Referalli::Models::post_branding_domain_response
     def post_branding_domain_verify: (?idempotency_key: String) -> ::Referalli::Models::post_branding_link_domain_verify_response
@@ -1192,9 +1361,13 @@ module Referalli
     def post_links: (::Referalli::Models::post_links_body, ?idempotency_key: String) -> ::Referalli::Models::created_link
     def post_mobile_purchases: (::Referalli::Models::post_mobile_purchases_body, ?idempotency_key: String) -> ::Referalli::Models::post_mobile_purchases_response
     def post_notifications_id_read: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
+    def post_oauth_token: (::Referalli::Models::post_oauth_token_body, ?idempotency_key: String) -> ::Referalli::Models::post_oauth_token_response
     def post_onchain_connections: (::Referalli::Models::post_onchain_connections_body, ?idempotency_key: String) -> ::Referalli::Models::post_onchain_connections_response
+    def post_org_hosted_pages_check: (?idempotency_key: String) -> ::Referalli::Models::post_org_hosted_pages_check_response
     def post_org_members: (::Referalli::Models::post_org_members_body, ?idempotency_key: String) -> ::Referalli::Models::post_org_members_response
+    def post_org_portal_auth_test: (?idempotency_key: String) -> ::Referalli::Models::post_org_portal_auth_test_response
     def post_orgs: (::Referalli::Models::post_orgs_body, ?idempotency_key: String) -> ::Referalli::Models::post_orgs_response
+    def post_org_sso_direct_test: (?idempotency_key: String) -> ::Referalli::Models::post_org_portal_auth_test_response
     def post_org_sso_link: (?idempotency_key: String) -> ::Referalli::Models::post_org_sso_link_response
     def post_org_sso_tickets: (::Referalli::Models::post_org_sso_tickets_body, ?idempotency_key: String) -> ::Referalli::Models::post_org_sso_tickets_response
     def post_org_sso_tickets_id_revoke: (String, ?idempotency_key: String) -> ::Referalli::Models::post_org_sso_tickets_id_revoke_response
@@ -1227,6 +1400,8 @@ module Referalli
     def post_payout_runs_id_cancel: (String, ?idempotency_key: String) -> ::Referalli::Models::post_payout_runs_id_cancel_response
     def post_payout_runs_id_execute: (String, ?idempotency_key: String) -> ::Referalli::Models::post_payout_runs_id_execute_response
     def post_payout_runs_run_scheduled: (?idempotency_key: String) -> ::Referalli::Models::post_payout_runs_run_scheduled_response
+    def post_privacy_executor_keys: (::Referalli::Models::post_privacy_executor_keys_body, ?idempotency_key: String) -> ::Referalli::Models::post_privacy_executor_keys_response
+    def post_privacy_executors_adapter_check: (String, ?idempotency_key: String) -> ::Referalli::Models::post_privacy_executors_adapter_check_response
     def post_privacy_forget: (::Referalli::Models::post_privacy_forget_body, ?idempotency_key: String) -> ::Referalli::Models::post_privacy_forget_response
     def post_privacy_lookup: (::Referalli::Models::post_privacy_lookup_body, ?idempotency_key: String) -> ::Referalli::Models::post_privacy_lookup_response
     def post_privacy_requests: (::Referalli::Models::post_privacy_requests_body, ?idempotency_key: String) -> ::Referalli::Models::post_privacy_requests_response
@@ -1246,10 +1421,13 @@ module Referalli
     def post_referrals_id_approve: (String, ?idempotency_key: String) -> ::Referalli::Models::referral
     def post_referrals_id_reassign: (String, ::Referalli::Models::post_referrals_id_reassign_body, ?idempotency_key: String) -> ::Referalli::Models::referral
     def post_referrals_id_void: (String, ?idempotency_key: String) -> ::Referalli::Models::referral
+    def post_rewards: (::Referalli::Models::post_rewards_body, ?idempotency_key: String) -> ::Referalli::Models::post_rewards_response
     def post_rewards_id_redeem: (String, ::Referalli::Models::post_rewards_id_redeem_body, ?idempotency_key: String) -> ::Referalli::Models::post_rewards_redeem_by_code_response
     def post_rewards_redeem_by_code: (::Referalli::Models::post_rewards_redeem_by_code_body, ?idempotency_key: String) -> ::Referalli::Models::post_rewards_redeem_by_code_response
     def post_roi_patterns_pattern_review: (String, ::Referalli::Models::post_roi_patterns_pattern_review_body, ?idempotency_key: String) -> ::Referalli::Models::fraud_case
     def post_sandbox_simulate: (::Referalli::Models::post_sandbox_simulate_body, ?idempotency_key: String) -> ::Referalli::Models::post_sandbox_simulate_response
+    def post_support_apps_adapter_test: (String, ::Referalli::Models::post_support_apps_adapter_test_body, ?idempotency_key: String) -> ::Referalli::Models::post_support_apps_adapter_test_response
+    def post_support_cards_org_id_adapter: (String, String, Hash[String, untyped], ?idempotency_key: String) -> ::Referalli::Models::post_support_cards_org_id_adapter_response
     def post_tax1099_documents_id_correct: (String, ?idempotency_key: String) -> ::Referalli::Models::tax_filing
     def post_tax1099_filings: (::Referalli::Models::post_tax1099_filings_body, ?idempotency_key: String) -> ::Referalli::Models::tax_filing
     def post_tax1099_filings_id_refresh: (String, ?idempotency_key: String) -> ::Referalli::Models::post_tax1099_filings_id_refresh_response
@@ -1260,14 +1438,16 @@ module Referalli
     def post_value_import: (::Referalli::Models::post_value_import_body, ?idempotency_key: String) -> ::Referalli::Models::post_value_import_response
     def post_webhook_deliveries_id_replay: (String, ?idempotency_key: String) -> ::Referalli::Models::ok
     def post_webhook_endpoints: (::Referalli::Models::post_webhook_endpoints_body, ?idempotency_key: String) -> ::Referalli::Models::post_webhook_endpoints_response
+    def post_webhook_endpoints_id_replay: (String, since: String, ?idempotency_key: String) -> ::Referalli::Models::post_webhook_endpoints_id_replay_response
     def post_webhook_endpoints_id_rotate_secret: (String, ?idempotency_key: String) -> ::Referalli::Models::post_webhook_endpoints_id_rotate_secret_response
     def post_widget_tokens: (::Referalli::Models::post_widget_tokens_body, ?idempotency_key: String) -> ::Referalli::Models::post_widget_tokens_response
     def post_zapier_conversions: (::Referalli::Models::post_zapier_conversions_body, ?idempotency_key: String) -> ::Referalli::Models::post_zapier_conversions_response
     def post_zapier_hooks: (::Referalli::Models::post_zapier_hooks_body, ?idempotency_key: String) -> ::Referalli::Models::zapier_hook
+    def put_auth_connections_id_secret: (String, ::Referalli::Models::put_auth_connections_id_secret_body, ?idempotency_key: String) -> ::Referalli::Models::put_auth_connections_id_secret_response
     def put_billing_connections_id_credentials: (String, ::Referalli::Models::put_billing_connections_id_credentials_body, ?idempotency_key: String) -> ::Referalli::Models::put_billing_connections_id_credentials_response
     def put_billing_connections_id_secret: (String, ::Referalli::Models::put_billing_connections_id_secret_body, ?idempotency_key: String) -> ::Referalli::Models::put_billing_connections_id_secret_response
     def put_billing_connections_id_value_mapping: (String, ::Referalli::Models::put_billing_connections_id_value_mapping_body, ?idempotency_key: String) -> ::Referalli::Models::put_billing_connections_id_value_mapping_response
-    def put_branding: (::Referalli::Models::put_branding_body, ?idempotency_key: String) -> ::Referalli::Models::ok
+    def put_branding: (::Referalli::Models::put_branding_body, ?idempotency_key: String) -> ::Referalli::Models::put_branding_response
     def put_email_settings: (::Referalli::Models::put_email_settings_body, ?idempotency_key: String) -> ::Referalli::Models::email_settings
     def put_email_templates_event_locale: (String, String, ::Referalli::Models::put_email_templates_event_locale_body, ?idempotency_key: String) -> ::Referalli::Models::put_email_templates_event_locale_response
     def put_integrations_hubspot: (::Referalli::Models::put_integrations_hubspot_body, ?idempotency_key: String) -> ::Referalli::Models::integration_connection
@@ -1277,11 +1457,15 @@ module Referalli
     def put_me_roi_digest: (::Referalli::Models::put_me_roi_digest_body, ?idempotency_key: String) -> ::Referalli::Models::put_me_roi_digest_response
     def put_network_settings: (::Referalli::Models::put_network_settings_body, ?idempotency_key: String) -> ::Referalli::Models::put_network_settings_response
     def put_org_fx_feed: (::Referalli::Models::put_org_fx_feed_body, ?idempotency_key: String) -> ::Referalli::Models::put_org_fx_feed_response
+    def put_org_hosted_pages: (::Referalli::Models::put_org_hosted_pages_body, ?idempotency_key: String) -> ::Referalli::Models::get_org_hosted_pages_response
     def put_org_payout_schedule: (::Referalli::Models::put_org_payout_schedule_body, ?idempotency_key: String) -> ::Referalli::Models::put_org_payout_schedule_response
+    def put_org_portal_auth: ((::Referalli::Models::put_org_portal_auth_body_option1 | ::Referalli::Models::put_org_portal_auth_body_option2 | ::Referalli::Models::put_org_portal_auth_body_option3), ?idempotency_key: String) -> ::Referalli::Models::put_org_portal_auth_response
     def put_org_referral_params: (::Referalli::Models::put_org_referral_params_body, ?idempotency_key: String) -> ::Referalli::Models::get_org_referral_params_response
     def put_org_retention: (::Referalli::Models::put_org_retention_body, ?idempotency_key: String) -> ::Referalli::Models::retention
+    def put_org_sso_direct: ((::Referalli::Models::put_org_sso_direct_body_option1 | ::Referalli::Models::put_org_sso_direct_body_option2), ?idempotency_key: String) -> ::Referalli::Models::put_org_sso_direct_response
     def put_org_tax_filing: (::Referalli::Models::put_org_tax_filing_body, ?idempotency_key: String) -> ::Referalli::Models::put_org_tax_filing_response
     def put_org_tax_profile: (::Referalli::Models::put_org_tax_profile_body, ?idempotency_key: String) -> ::Referalli::Models::tax_profile
+    def put_org_tracking_consent: (::Referalli::Models::put_org_tracking_consent_body, ?idempotency_key: String) -> ::Referalli::Models::get_org_tracking_consent_response
     def put_partner_locale: (::Referalli::Models::put_partner_locale_body, ?idempotency_key: String) -> ::Referalli::Models::put_partner_locale_response
     def put_partner_orgs_org_id_payout_profile: (String, ::Referalli::Models::put_partner_orgs_org_id_payout_profile_body, ?idempotency_key: String) -> ::Referalli::Models::put_partner_orgs_org_id_payout_profile_response
     def put_partner_orgs_org_id_postback: (String, ::Referalli::Models::put_partner_orgs_org_id_postback_body, ?idempotency_key: String) -> ::Referalli::Models::put_partner_orgs_org_id_postback_response
@@ -1298,6 +1482,8 @@ module Referalli
     def put_programs_id_partners_partner_id_group: (String, String, ::Referalli::Models::put_programs_id_partners_partner_id_group_body, ?idempotency_key: String) -> ::Referalli::Models::put_programs_id_partners_partner_id_group_response
     def put_programs_id_payout_schedule: (String, ::Referalli::Models::put_programs_id_payout_schedule_body, ?idempotency_key: String) -> ::Referalli::Models::put_programs_id_payout_schedule_response
     def put_programs_id_referee_reward: (String, ::Referalli::Models::put_programs_id_referee_reward_body, ?idempotency_key: String) -> ::Referalli::Models::put_programs_id_referee_reward_response
+    def put_rewards_rules_key: (String, ::Referalli::Models::put_rewards_rules_key_body, ?idempotency_key: String) -> ::Referalli::Models::put_rewards_rules_key_response
+    def put_support_apps_adapter: (String, ::Referalli::Models::put_support_apps_adapter_body, ?idempotency_key: String) -> ::Referalli::Models::put_support_apps_adapter_response
   end
 
   type page[T] = { "object" => String, "data" => Array[T], "has_more" => bool, "next_cursor" => String? }
@@ -1465,6 +1651,16 @@ module Referalli
   class WebhookEndpointDisabledEvent < WebhookEvent
     TOPIC: String
     def data: () -> ::Referalli::Models::webhook_endpoint_disabled_event_data
+  end
+
+  class WebhookEndpointFailingEvent < WebhookEvent
+    TOPIC: String
+    def data: () -> ::Referalli::Models::webhook_endpoint_failing_event_data
+  end
+
+  class WebhookEndpointRecoveredEvent < WebhookEvent
+    TOPIC: String
+    def data: () -> ::Referalli::Models::webhook_endpoint_recovered_event_data
   end
 
 end

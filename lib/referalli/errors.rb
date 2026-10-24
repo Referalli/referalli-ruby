@@ -43,6 +43,9 @@ module Referalli
   # `step_up_required` (HTTP 401).
   class StepUpRequiredError < ApiError; end
 
+  # `reauth_required` (HTTP 401).
+  class ReauthRequiredError < ApiError; end
+
   # `payment_required` (HTTP 402).
   class PaymentRequiredError < ApiError; end
 
@@ -112,6 +115,7 @@ module Referalli
     "bad_request" => BadRequestError,
     "unauthorized" => AuthenticationError,
     "step_up_required" => StepUpRequiredError,
+    "reauth_required" => ReauthRequiredError,
     "payment_required" => PaymentRequiredError,
     "forbidden" => PermissionDeniedError,
     "webhooks_disabled" => WebhooksDisabledError,

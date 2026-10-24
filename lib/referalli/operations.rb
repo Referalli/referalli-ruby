@@ -43,6 +43,15 @@ module Referalli
       request("DELETE", "/v1/billing/connections/#{seg(id)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Remove an internal customer. DELETE /v1/billing/internal-customers/{customerRef}
+    #
+    # Their payments earn again from now on (events already ignored stay ignored). Audited.
+    #
+    # **Auth:** an API key with `billing:write` (or `full`), or a session with role `owner`, `admin`.
+    def delete_billing_internal_customers_customer_ref(customer_ref, idempotency_key: nil)
+      request("DELETE", "/v1/billing/internal-customers/#{seg(customer_ref)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Remove the portal domain. DELETE /v1/branding/domain
     #
     # Stops serving the partner portal on the custom domain.
@@ -97,6 +106,15 @@ module Referalli
       request("DELETE", "/v1/org/members/#{seg(user_id)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Remove your identity provider. DELETE /v1/org/sso/direct
+    #
+    # Removes the org's own IdP configuration; team SSO and "require SSO" turn off, so nobody is locked out. Owner only.
+    #
+    # **Auth:** an API key with `org:write` (or `full`), or a session with role `owner`.
+    def delete_org_sso_direct(idempotency_key: nil)
+      request("DELETE", "/v1/org/sso/direct", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Delete a partner. DELETE /v1/partners/{id}
     #
     # Deletes a partner that never did anything, with its enrollments, links, coupons and payout profile. A partner with any clicks, referrals, commissions, payouts or other history is `409`: archive it instead (`status: "archived"`). Audited.
@@ -115,6 +133,15 @@ module Referalli
       request("DELETE", "/v1/payout-connections/#{seg(provider)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Disconnect a DSAR tool. DELETE /v1/privacy/executors/{adapter}
+    #
+    # Removes the tool, its key and settings; its URL answers 404 from now on. The request log stays.
+    #
+    # **Auth:** an API key with `privacy:write` (or `full`), or a session with role `owner`, `admin`.
+    def delete_privacy_executors_adapter(adapter, idempotency_key: nil)
+      request("DELETE", "/v1/privacy/executors/#{seg(adapter)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Delete a product margin. DELETE /v1/profitability/products/{productRef}
     #
     # Removes a product from the margin catalog; its payments fall back to the program or org margin. Audited.
@@ -122,6 +149,24 @@ module Referalli
     # **Auth:** an API key with `analytics:write` (or `full`), or a session with role `owner`, `admin`.
     def delete_profitability_products_product_ref(product_ref, idempotency_key: nil)
       request("DELETE", "/v1/profitability/products/#{seg(product_ref)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Delete a reward rule. DELETE /v1/rewards/rules/{key}
+    #
+    # Deletes the rule. Rewards already granted through it stay.
+    #
+    # **Auth:** an API key with `commissions:write` (or `full`), or a session with role `owner`, `admin`.
+    def delete_rewards_rules_key(key, idempotency_key: nil)
+      request("DELETE", "/v1/rewards/rules/#{seg(key)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Disconnect a support tool. DELETE /v1/support/apps/{adapter}
+    #
+    # Removes the tool and its secret; its card URL answers 404 from now on.
+    #
+    # **Auth:** an API key with `partners:write` (or `full`), or a session with role `owner`, `admin`.
+    def delete_support_apps_adapter(adapter, idempotency_key: nil)
+      request("DELETE", "/v1/support/apps/#{seg(adapter)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Delete a webhook endpoint. DELETE /v1/webhook-endpoints/{id}
@@ -459,6 +504,15 @@ module Referalli
       request("GET", "/v1/auth/connections/#{seg(id)}/export", query: { "customerRef" => customer_ref }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # List identity connectors. GET /v1/auth/connections/providers
+    #
+    # Every auth provider you can connect (Atlas, Clerk, Auth0, Supabase, Firebase, Cognito, Stytch, Kinde, WorkOS, generic, your own auth), with how it connects, who issues the secret, the setup steps, a copyable template where the vendor has no native webhook, and where the referral metadata lands.
+    #
+    # **Auth:** an API key with `integrations:read` (or `full`), or a session of any role.
+    def get_auth_connections_providers(idempotency_key: nil)
+      request("GET", "/v1/auth/connections/providers", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # List sign-in providers. GET /v1/auth/providers
     #
     # The identity providers configured on this deployment, for rendering sign-in buttons.
@@ -499,7 +553,7 @@ module Referalli
 
     # List billing events. GET /v1/billing/events
     #
-    # Payments, refunds and other billing events received from every connection, newest first. Filter with `customerRef`.
+    # Payments, refunds and other billing events received from every connection, newest first. Filter with `customerRef`, or `status=ignored_by_filter` for the events a product filter or the internal-customer list set aside (recorded, never processed).
     #
     # **Auth:** an API key with `billing:read` (or `full`), or a session of any role.
     #
@@ -508,13 +562,22 @@ module Referalli
     # ending_before: A cursor: returns the items before this item id (the previous page). Not with `starting_after`. From API version 2026-11-01; ignored under 2026-10-21, where lists are a capped plain array.
     # created[gte]: Only items created at or after this time (ISO 8601), on lists of timestamped records. From API version 2026-11-01; ignored under 2026-10-21, where lists are a capped plain array.
     # created[lte]: Only items created at or before this time (ISO 8601), on lists of timestamped records. From API version 2026-11-01; ignored under 2026-10-21, where lists are a capped plain array.
-    def get_billing_events(customer_ref: nil, limit: nil, starting_after: nil, ending_before: nil, created_gte: nil, created_lte: nil, idempotency_key: nil)
-      request("GET", "/v1/billing/events", query: { "customerRef" => customer_ref, "limit" => limit, "starting_after" => starting_after, "ending_before" => ending_before, "created[gte]" => created_gte, "created[lte]" => created_lte }, body: nil, idempotency_key: idempotency_key, kind: :list)
+    def get_billing_events(customer_ref: nil, status: nil, limit: nil, starting_after: nil, ending_before: nil, created_gte: nil, created_lte: nil, idempotency_key: nil)
+      request("GET", "/v1/billing/events", query: { "customerRef" => customer_ref, "status" => status, "limit" => limit, "starting_after" => starting_after, "ending_before" => ending_before, "created[gte]" => created_gte, "created[lte]" => created_lte }, body: nil, idempotency_key: idempotency_key, kind: :list)
     end
 
     # Every item of #get_billing_events, following the pages.
-    def get_billing_events_each(customer_ref: nil, limit: nil, ending_before: nil, created_gte: nil, created_lte: nil, idempotency_key: nil, &block)
-      paginate(->(cursor) { get_billing_events(customer_ref: customer_ref, limit: limit, ending_before: ending_before, created_gte: created_gte, created_lte: created_lte, starting_after: cursor, idempotency_key: idempotency_key) }, &block)
+    def get_billing_events_each(customer_ref: nil, status: nil, limit: nil, ending_before: nil, created_gte: nil, created_lte: nil, idempotency_key: nil, &block)
+      paginate(->(cursor) { get_billing_events(customer_ref: customer_ref, status: status, limit: limit, ending_before: ending_before, created_gte: created_gte, created_lte: created_lte, starting_after: cursor, idempotency_key: idempotency_key) }, &block)
+    end
+
+    # List internal customers. GET /v1/billing/internal-customers
+    #
+    # The org's own customers (staff, test accounts, your own plans) whose payments never earn on any connection. Metadata `planSource: "internal"` on the provider's customer does the same without a list.
+    #
+    # **Auth:** an API key with `billing:read` (or `full`), or a session of any role.
+    def get_billing_internal_customers(idempotency_key: nil)
+      request("GET", "/v1/billing/internal-customers", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Get the plan. GET /v1/billing/plan
@@ -528,11 +591,20 @@ module Referalli
 
     # Get branding. GET /v1/branding
     #
-    # The org's logo, theme tokens, sender address, and its custom portal and link domains with their status (`none`, `pending` DNS, `provisioning` a certificate, `active`).
+    # The org's logo, theme tokens, sender address, and its custom portal and link domains with their status (`none`, `pending` DNS, `provisioning` a certificate, `active`), and `warnings` for theme colour pairs below WCAG AA contrast.
     #
     # **Auth:** an API key with `org:read` (or `full`), or a session of any role.
     def get_branding(idempotency_key: nil)
       request("GET", "/v1/branding", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Get the support-chat identity. GET /v1/chatly/identity
+    #
+    # The signed-in merchant user or partner as a Chatly widget identity: `externalId` (`merchant:<id>` or `partner:<id>`), email, name and `userHash`, the HMAC-SHA256 of `externalId` with Referalli's identity secret. `identity` is null when signed out or when identity verification isn't configured. Never cached.
+    #
+    # **Auth:** none.
+    def get_chatly_identity(idempotency_key: nil)
+      request("GET", "/v1/chatly/identity", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Get a customer's consent. GET /v1/cleanroom/consent
@@ -551,6 +623,26 @@ module Referalli
     # **Auth:** an API key with `growth:read` (or `full`), or a session of any role.
     def get_cleanroom_query(dimension:, idempotency_key: nil)
       request("GET", "/v1/cleanroom/query", query: { "dimension" => dimension }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Get consent coverage. GET /v1/clicks/consent-coverage
+    #
+    # The share of attributed sign-ups in the last `days` (default 30) whose referral carries consent evidence, on its click or on the `associate` call. Low coverage means sign-ups are attributed from tags without a consent setting (`none`) or from server-side calls that don't pass `consent`.
+    #
+    # **Auth:** an API key with `links:read` (or `full`), or a session of any role.
+    #
+    # days: Look-back window in days.
+    def get_clicks_consent_coverage(days: nil, idempotency_key: nil)
+      request("GET", "/v1/clicks/consent-coverage", query: { "days" => days }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Get a click. GET /v1/clicks/{id}
+    #
+    # One click with its consent evidence: what the visitor's CMP said when the tracker stored the referral (`consent.provider`, `state`, `stamp`, `tcString`…). A redirect click (`/go`) is recorded before the landing page reads the CMP, so its evidence comes from the first consented visit beacon naming it. `consent` is null when none arrived.
+    #
+    # **Auth:** an API key with `links:read` (or `full`), or a session of any role.
+    def get_clicks_id(id, idempotency_key: nil)
+      request("GET", "/v1/clicks/#{seg(id)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Get a pending CLI sign-in. GET /v1/cli/device-codes/{userCode}
@@ -778,6 +870,17 @@ module Referalli
       paginate(->(cursor) { get_email_templates(limit: limit, ending_before: ending_before, created_gte: created_gte, created_lte: created_lte, starting_after: cursor, idempotency_key: idempotency_key) }, &block)
     end
 
+    # Get one org's embed manifest. GET /v1/embed
+    #
+    # The embed manifest for the org that owns `token` (its public tracking token): its link domain in the CSP origins, its longest program cookie window as the storage lifetime, and its consent default. Public, CORS `*`.
+    #
+    # **Auth:** none.
+    #
+    # token: The org's public tracking token.
+    def get_embed(token:, idempotency_key: nil)
+      request("GET", "/v1/embed", query: { "token" => token }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Read embedded partner stats. GET /v1/embed/summary
     #
     # Called by the embed component with `Authorization: Bearer <embed token>`: the partner's name, eligible clicks, active referrals, balances and link codes. 401 for a missing, invalid or expired token.
@@ -785,6 +888,19 @@ module Referalli
     # **Auth:** none.
     def get_embed_summary(idempotency_key: nil)
       request("GET", "/v1/embed/summary", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # List past events. GET /v1/events
+    #
+    # The org's events, oldest first, in the shape webhook deliveries carry: filter with `since` and `topics`, page with `after` (the previous page's `nextCursor`). Every event is listed whether or not an endpoint subscribed to it. `referalli events tail --since 1h` uses it to backfill before tailing live.
+    #
+    # **Auth:** an API key with `webhooks:read` (or `full`), or a session of any role.
+    #
+    # since: Only events created at or after this time.
+    # topics: Comma-separated topics (default: every topic).
+    # after: The `nextCursor` of the previous page: events after this one.
+    def get_events(since: nil, topics: nil, after: nil, limit: nil, idempotency_key: nil)
+      request("GET", "/v1/events", query: { "since" => since, "topics" => topics, "after" => after, "limit" => limit }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Export payouts for accounting. GET /v1/export/accounting
@@ -888,6 +1004,15 @@ module Referalli
     # **Auth:** an API key with `analytics:read` (or `full`), or a session of any role.
     def get_incrementality(program_id:, idempotency_key: nil)
       request("GET", "/v1/incrementality", query: { "programId" => program_id }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Check integration health. GET /v1/integration-health
+    #
+    # Every connection the org depends on, each with `ok`, a `detail`, and when it fails a `fix` and `docs` link: billing connections (and when each last received an event), sign-up connections, the tracking snippet (a visit in the last 30 days), payout connections, outbound webhook endpoints, and every adapter of a connected port. `hop` names the leg that failed on a path between systems. `ok` at the top is true only when every check is.
+    #
+    # **Auth:** an API key with `integrations:read` (or `full`), or a session of any role.
+    def get_integration_health(idempotency_key: nil)
+      request("GET", "/v1/integration-health", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # List integrations. GET /v1/integrations
@@ -1112,6 +1237,15 @@ module Referalli
       request("GET", "/v1/org/fx-feed", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Get the hosted-page consent and chat. GET /v1/org/hosted-pages
+    #
+    # What runs on the pages Referalli hosts for you on your own portal domain (the partner portal and `/join`): your consent banner (Cookie Munch, OneTrust, Cookiebot, Usercentrics, Didomi, Osano, Termly, iubenda, a custom CMP, a built-in necessary-only notice, or none) and your support chat (Chatly, Intercom, Crisp or custom). `served` is exactly what visitors get: the head tags, the "Cookie settings" link and the Content-Security-Policy built from these adapters. Referalli's own banner and chat never run on your domain.
+    #
+    # **Auth:** an API key with `org:read` (or `full`), or a session of any role.
+    def get_org_hosted_pages(idempotency_key: nil)
+      request("GET", "/v1/org/hosted-pages", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # List team members. GET /v1/org/members
     #
     # Members of the org with their role and email, oldest first.
@@ -1139,6 +1273,15 @@ module Referalli
     # **Auth:** an API key with `payouts:read` (or `full`), or a session of any role.
     def get_org_payout_schedule(idempotency_key: nil)
       request("GET", "/v1/org/payout-schedule", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Get partner sign-in settings. GET /v1/org/portal-auth
+    #
+    # How partners sign in to the org's portal: `referalli` (partner accounts, the default), `oidc` (the merchant's IdP) or `custom` (the merchant's own session, as a short-lived JWT). Includes the audience tokens must carry, the URL to send partners to, the redirect URI to register, and the last check. Never the secret.
+    #
+    # **Auth:** an API key with `org:read` (or `full`), or a session with role `owner`, `admin`.
+    def get_org_portal_auth(idempotency_key: nil)
+      request("GET", "/v1/org/portal-auth", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Get referral query parameters. GET /v1/org/referral-params
@@ -1184,6 +1327,15 @@ module Referalli
     # **Auth:** an API key with `org:read` (or `full`), or a session with role `owner`, `admin`, `finance`.
     def get_org_tax_profile(idempotency_key: nil)
       request("GET", "/v1/org/tax-profile", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Get the tracker's consent default. GET /v1/org/tracking-consent
+    #
+    # How `aff.js` reads visitor consent unless the tag says otherwise (`data-consent`): `auto` detects the site's CMP (Cookie Munch, OneTrust, Cookiebot, Usercentrics, Didomi, Osano, Termly, IAB TCF and GPP, Google Consent Mode, or `window.referalliConsent`), an adapter id pins one, `pending` waits for `aff.consent(true|false)`, and `none` always stores. Until consent is granted nothing is stored or sent; the referral stays in memory for the sign-up. `noCmp` is what `auto` does on a site without a CMP. `configured: false` is an org that never chose: it serves `none`, so existing tags behave as before. Lists the adapters with their default category.
+    #
+    # **Auth:** an API key with `org:read` (or `full`), or a session of any role.
+    def get_org_tracking_consent(idempotency_key: nil)
+      request("GET", "/v1/org/tracking-consent", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # List outreach messages. GET /v1/outreach
@@ -1837,6 +1989,42 @@ module Referalli
       request("GET", "/v1/payouts/#{seg(id)}/invoice", query: { "format" => format }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # List public plans. GET /v1/plans
+    #
+    # The public plan catalog in display order: monthly price in minor units (USD, billed monthly in advance), limits and features. No authentication; cacheable for an hour. No plan charges a transaction or payout fee.
+    #
+    # **Auth:** none.
+    def get_plans(idempotency_key: nil)
+      request("GET", "/v1/plans", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # What a merchant's portal sign-in offers. GET /v1/portal-auth/current
+    #
+    # For the portal's sign-in page: the org (from `org`, or the merchant's portal domain this is called on) and its partner sign-in adapter, with the button label and where it starts. `referalli` with no start URL when the org uses Referalli partner accounts.
+    #
+    # **Auth:** none.
+    def get_portal_auth_current(org: nil, idempotency_key: nil)
+      request("GET", "/v1/portal-auth/current", query: { "org" => org }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # List DSAR tool requests. GET /v1/privacy/executor-requests
+    #
+    # The last 200 requests connected DSAR tools sent: operation, outcome and the vendor request id. Subjects are kept only as hashes.
+    #
+    # **Auth:** an API key with `privacy:read` (or `full`), or a session with role `owner`, `admin`.
+    def get_privacy_executor_requests(idempotency_key: nil)
+      request("GET", "/v1/privacy/executor-requests", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # List connected DSAR tools. GET /v1/privacy/executors
+    #
+    # Every DSAR tool that can reach Referalli as a connected system (Cookie Munch cm-standard-v1, OneTrust, Transcend, DataGrail, Ketch, Osano, `custom` for any tool speaking Standard Webhooks), with the per-org URL to register, install steps and a health check. Keys are never returned.
+    #
+    # **Auth:** an API key with `privacy:read` (or `full`), or a session with role `owner`, `admin`.
+    def get_privacy_executors(idempotency_key: nil)
+      request("GET", "/v1/privacy/executors", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Export a customer's data. GET /v1/privacy/export
     #
     # Every stored row that references the customer, for a data-subject access request.
@@ -2185,6 +2373,15 @@ module Referalli
       paginate(->(cursor) { get_rewards(status: status, limit: limit, ending_before: ending_before, created_gte: created_gte, created_lte: created_lte, starting_after: cursor, idempotency_key: idempotency_key) }, &block)
     end
 
+    # List partner rewards. GET /v1/rewards/granted
+    #
+    # The last 200 rewards granted through `POST /v1/rewards`, with the commission line each one posted.
+    #
+    # **Auth:** an API key with `commissions:read` (or `full`), or a session of any role.
+    def get_rewards_granted(idempotency_key: nil)
+      request("GET", "/v1/rewards/granted", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Look up a reward code. GET /v1/rewards/lookup/{code}
     #
     # Whether a reward code is valid (issued and unredeemed), with its kind and amount, so your checkout can apply it. Unknown codes answer `{ "valid": false }`.
@@ -2192,6 +2389,15 @@ module Referalli
     # **Auth:** an API key with `commissions:read` (or `full`), or a session of any role.
     def get_rewards_lookup_code(code, idempotency_key: nil)
       request("GET", "/v1/rewards/lookup/#{seg(code)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # List reward rules. GET /v1/rewards/rules
+    #
+    # Your rules that turn an inbound event (or a rule key) into a fixed partner reward.
+    #
+    # **Auth:** an API key with `commissions:read` (or `full`), or a session of any role.
+    def get_rewards_rules(idempotency_key: nil)
+      request("GET", "/v1/rewards/rules", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Get the ROI breakdown. GET /v1/roi/breakdown
@@ -2377,6 +2583,36 @@ module Referalli
     # **Auth:** none.
     def get_status_incidents_id(id, idempotency_key: nil)
       request("GET", "/v1/status/incidents/#{seg(id)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # List support tool connections. GET /v1/support/apps
+    #
+    # Every support tool Referalli can show referral context in (Chatly cards and AI tools, Intercom, Zendesk, HubSpot, Front, Help Scout, custom), with its card URL, install steps and whether it is set up. Secrets are never returned.
+    #
+    # **Auth:** an API key with `partners:read` (or `full`), or a session with role `owner`, `admin`.
+    def get_support_apps(idempotency_key: nil)
+      request("GET", "/v1/support/apps", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Render a support card for a tool (GET). GET /v1/support/cards/{orgId}/{adapter}
+    #
+    # The same card for tools that fetch with GET (HubSpot legacy CRM cards pass the contact as query parameters). Signed as for the POST form; 404 otherwise.
+    #
+    # **Auth:** none.
+    def get_support_cards_org_id_adapter(org_id, adapter, email: nil, external_id: nil, idempotency_key: nil)
+      request("GET", "/v1/support/cards/#{seg(org_id)}/#{seg(adapter)}", query: { "email" => email, "externalId" => external_id }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Get referral context for a support contact. GET /v1/support/context
+    #
+    # What a support agent should know about a contact: the partner (status, tier, programs, referral link, pending/approved/paid balances, next payout, open flags) and/or the referred customer (who referred them, when, the referee reward and what is left of it). Name the contact by `partnerExternalRef`, `ext` (a tool's verified external id), `customerRef` or `email`; the email is used only when no stronger key is given. Your org's data only; `partner` and `customer` are null when nothing matches.
+    #
+    # **Auth:** an API key with `partners:read` (or `full`), or a session with role `owner`, `admin`, `support`, `finance`, `analyst`.
+    #
+    # email: Used only when no stronger key is given.
+    # ext: A support tool's verified external id: matched as a partner externalRef, then as a customer ref.
+    def get_support_context(email: nil, customer_ref: nil, partner_external_ref: nil, ext: nil, idempotency_key: nil)
+      request("GET", "/v1/support/context", query: { "email" => email, "customerRef" => customer_ref, "partnerExternalRef" => partner_external_ref, "ext" => ext }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Export 1099-NEC data. GET /v1/tax/1099
@@ -2620,7 +2856,7 @@ module Referalli
 
     # Update a billing connection. PATCH /v1/billing/connections/{id}
     #
-    # Renames a connection or sets `status`: `paused` makes its webhook URL refuse events until set back to `active`. Audited.
+    # Renames a connection, sets `status` (`paused` makes its webhook URL refuse events until set back to `active`), or sets its product `filter` (`null` removes it). A filter applies to events received from then on. Audited.
     #
     # **Auth:** an API key with `billing:write` (or `full`), or a session with role `owner`, `admin`.
     def patch_billing_connections_id(id, body, idempotency_key: nil)
@@ -2701,11 +2937,20 @@ module Referalli
 
     # Update a webhook endpoint. PATCH /v1/webhook-endpoints/{id}
     #
-    # Changes the URL, topics, programs (`null` or `[]` for every program) or legacy signature, or pauses it (`status: "paused"`, deliveries held). Setting `active` re-enables a paused or auto-disabled endpoint: held deliveries resume and the failure clock starts over. Audited.
+    # Changes the URL, topics, programs (`null` or `[]` for every program) or legacy signature, or pauses it (`status: "paused"`, deliveries held). Setting `active` re-enables a paused or auto-disabled endpoint: held deliveries resume and the failure clock starts over. `warnings` has `domain_changed` when the URL moves to another host. Audited.
     #
     # **Auth:** an API key with `webhooks:write` (or `full`), or a session with role `owner`, `admin`.
     def patch_webhook_endpoints_id(id, body, idempotency_key: nil)
       request("PATCH", "/v1/webhook-endpoints/#{seg(id)}", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Close your own account. POST /v1/account/close
+    #
+    # Closes the signed-in merchant user or partner account: every session ends, identity is redacted and commission records stay under a pseudonym. Send `confirm` with the account's email. Refused (409) for an organization's only owner or a partner still owed money. Step-up: `x-totp-code` when two-factor is on, otherwise a sign-in less than 15 minutes old (else 401 `step_up_required`).
+    #
+    # **Auth:** a partner session.
+    def post_account_close(body, idempotency_key: nil)
+      request("POST", "/v1/account/close", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Set an organization's plan. POST /v1/admin/orgs/{id}/plan
@@ -2816,6 +3061,15 @@ module Referalli
       request("POST", "/v1/attribution/replay", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Receive an OpenID Connect back-channel logout. POST /v1/auth/backchannel-logout
+    #
+    # The `backchannel_logout_uri` of Referalli's own sign-in client. Takes a form-encoded `logout_token` (OpenID Connect Back-Channel Logout 1.0): verified against the issuer's keys, `aud`, `events`, a fresh `iat`, no `nonce`, and a single-use `jti`; then ends the Referalli sessions for its `sid` (or every session of its `sub`). Answers 503 until the deployment sets IDP_LOGOUT_SYNC=true.
+    #
+    # **Auth:** none.
+    def post_auth_backchannel_logout(body, idempotency_key: nil)
+      request("POST", "/v1/auth/backchannel-logout", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Connect an auth platform. POST /v1/auth/connections
     #
     # Connects your sign-up system so new users are attributed server-side without calling associate: `clerk`, `supabase`, `workos` or `generic` receive the platform's user webhooks at the returned URL; `atlas` and `custom` call the signed protocol endpoints under `/v1/auth/connections/{id}/`. `autoEnrollUsers` makes every new user a partner too. Returns the signing secret once. 409 when an Atlas instance already has a connection.
@@ -2841,6 +3095,15 @@ module Referalli
     # **Auth:** a signature (see above); no API key.
     def post_auth_connections_id_erase(id, body, idempotency_key: nil)
       request("POST", "/v1/auth/connections/#{seg(id)}/erase", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Enrol a user as a partner (signed protocol). POST /v1/auth/connections/{id}/partners
+    #
+    # A user asked to become a partner from the platform, with the code they chose: they are enrolled now (whatever `autoEnrollUsers` says), with a coupon and, when the connection has a destination, a link. 409 when the code is held by someone else. Signed like the other protocol calls (`x-referalli-signature`, `x-referalli-id`).
+    #
+    # **Auth:** none.
+    def post_auth_connections_id_partners(id, body, idempotency_key: nil)
+      request("POST", "/v1/auth/connections/#{seg(id)}/partners", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Test an auth connection (signed protocol). POST /v1/auth/connections/{id}/ping
@@ -2897,6 +3160,15 @@ module Referalli
       request("POST", "/v1/auth/connections/#{seg(id)}/users", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Approve a one-click install. POST /v1/auth/connections/install
+    #
+    # The dashboard's consent step for `GET /v1/oauth/authorize`: `allow` returns the redirect back to the platform with a single-use code (10 minutes) for the chosen program; `deny` returns it with `error=access_denied`. Owner or admin. Audited.
+    #
+    # **Auth:** an API key with `integrations:write` (or `full`), or a session with role `owner`, `admin`.
+    def post_auth_connections_install(body, idempotency_key: nil)
+      request("POST", "/v1/auth/connections/install", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Sign out. POST /v1/auth/logout
     #
     # Ends the browser session (and any portal-domain sessions handed off from it) and clears the cookies. Returns the identity provider's `logoutUrl` to end the provider session too, or `null`.
@@ -2926,7 +3198,7 @@ module Referalli
 
     # Create a billing connection. POST /v1/billing/connections
     #
-    # Connects a billing provider (`stripe`, `paddle`, `lemonsqueezy`, `polar`, `chargebee`, `shopify`, `recurly`, `braintree`, `woocommerce`, `bigcommerce` or `generic`) so its payment webhooks become commissions. Returns the `webhookUrl` path to register with the provider and its signing secret (generated unless you pass the provider's own `webhookSecret`); the secret is returned only here. Audited.
+    # Connects a billing provider (`stripe`, `paddle`, `lemonsqueezy`, `polar`, `chargebee`, `shopify`, `recurly`, `braintree`, `woocommerce`, `bigcommerce` or `generic`) so its payment webhooks become commissions. Returns the `webhookUrl` path to register with the provider and its signing secret (generated unless you pass the provider's own `webhookSecret`); the secret is returned only here. A `filter` (`productIds`, `priceIds`, `skus` and/or exact `metadata`) limits which payments and subscription events earn when one provider account sells several products; the rest are recorded as `ignored_by_filter`. Audited.
     #
     # **Auth:** an API key with `billing:write` (or `full`), or a session with role `owner`, `admin`.
     def post_billing_connections(body, idempotency_key: nil)
@@ -2949,6 +3221,15 @@ module Referalli
     # **Auth:** an API key with `billing:write` (or `full`), or a session with role `owner`, `admin`.
     def post_billing_connections_id_value_mapping_preview(id, body, idempotency_key: nil)
       request("POST", "/v1/billing/connections/#{seg(id)}/value-mapping/preview", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Add an internal customer. POST /v1/billing/internal-customers
+    #
+    # Marks a customer ref (the provider customer id, or the `referalli_customer_ref` it is linked to) as internal: its payments are recorded as `ignored_by_filter` from now on. Idempotent; a repeat updates the note. Audited.
+    #
+    # **Auth:** an API key with `billing:write` (or `full`), or a session with role `owner`, `admin`.
+    def post_billing_internal_customers(body, idempotency_key: nil)
+      request("POST", "/v1/billing/internal-customers", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Open the subscription portal. POST /v1/billing/portal
@@ -3347,6 +3628,15 @@ module Referalli
       request("POST", "/v1/notifications/#{seg(id)}/read", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Exchange an install code. POST /v1/oauth/token
+    #
+    # Server to server: the platform trades the single-use code and its PKCE `code_verifier` for a new signed-protocol connection and its signing secret (returned only here). Installing again for the same instance keeps the connection and issues a new secret, the old one verifying for 24 hours. 401 for an unknown, used, expired or mismatched code. No authentication.
+    #
+    # **Auth:** none.
+    def post_oauth_token(body, idempotency_key: nil)
+      request("POST", "/v1/oauth/token", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Create an on-chain connection. POST /v1/onchain/connections
     #
     # Connects an on-chain indexer: on-chain conversions posted to its webhook URL become billing events. Returns the webhook URL and signing secret.
@@ -3354,6 +3644,15 @@ module Referalli
     # **Auth:** an API key with `billing:write` (or `full`), or a session with role `owner`, `admin`.
     def post_onchain_connections(body, idempotency_key: nil)
       request("POST", "/v1/onchain/connections", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Check the hosted-page adapters. POST /v1/org/hosted-pages/check
+    #
+    # Read-only checks against the vendors: does the Cookie Munch site exist (and a reminder to add your portal domain as its alias), does each script URL answer. Updates `status` and `lastError`. Owner or admin.
+    #
+    # **Auth:** an API key with `org:write` (or `full`), or a session with role `owner`, `admin`.
+    def post_org_hosted_pages_check(idempotency_key: nil)
+      request("POST", "/v1/org/hosted-pages/check", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Add a team member. POST /v1/org/members
@@ -3365,6 +3664,15 @@ module Referalli
       request("POST", "/v1/org/members", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Test partner sign-in. POST /v1/org/portal-auth/test
+    #
+    # Checks the partner sign-in configuration (JWKS reachable, or OIDC discovery) and records the result.
+    #
+    # **Auth:** an API key with `org:write` (or `full`), or a session with role `owner`, `admin`.
+    def post_org_portal_auth_test(idempotency_key: nil)
+      request("POST", "/v1/org/portal-auth/test", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Create an organization. POST /v1/orgs
     #
     # Creates an organization with the signed-in user as its owner. Needs a user session (not an API key) but no `x-org-id`. Limited to 20 per hour per user. Live mode only.
@@ -3372,6 +3680,15 @@ module Referalli
     # **Auth:** an API key with `team:write` (or `full`), or a session of any role.
     def post_orgs(body, idempotency_key: nil)
       request("POST", "/v1/orgs", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Test your identity provider. POST /v1/org/sso/direct/test
+    #
+    # Checks the configuration against the IdP (OIDC discovery, or the WorkOS organization) and records the result as the configuration's last success or last error.
+    #
+    # **Auth:** an API key with `org:write` (or `full`), or a session with role `owner`, `admin`.
+    def post_org_sso_direct_test(idempotency_key: nil)
+      request("POST", "/v1/org/sso/direct/test", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Link the org to SSO. POST /v1/org/sso/link
@@ -3662,6 +3979,24 @@ module Referalli
       request("POST", "/v1/payout-runs/run-scheduled", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Mint a DSAR executor key. POST /v1/privacy/executor-keys
+    #
+    # Enables a DSAR tool for your org and mints its executor key (a bearer key, or a `whsec_` secret for Standard Webhooks), returned once. Rotating stops the old key at once. Also stores vendor settings: a Transcend public key and API key for completion callbacks, an Osano webhook secret.
+    #
+    # **Auth:** an API key with `privacy:write` (or `full`), or a session with role `owner`, `admin`.
+    def post_privacy_executor_keys(body, idempotency_key: nil)
+      request("POST", "/v1/privacy/executor-keys", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Check a DSAR tool connection. POST /v1/privacy/executors/{adapter}/check
+    #
+    # Whether the tool is ready: a key or the vendor credentials it needs, and no failing requests since it was set up. Answers `{ok, detail, fix}`.
+    #
+    # **Auth:** an API key with `privacy:write` (or `full`), or a session with role `owner`, `admin`.
+    def post_privacy_executors_adapter_check(adapter, idempotency_key: nil)
+      request("POST", "/v1/privacy/executors/#{seg(adapter)}/check", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Erase a data subject. POST /v1/privacy/forget
     #
     # Erases (pseudonymizes, keeping the ledger balanced) a customer by `customerRef`, a partner by `partnerId`, or by `email` both the partner with that email and every customer stored under its hash. Send exactly one. 400 when nothing is found. Audited.
@@ -3833,6 +4168,15 @@ module Referalli
       request("POST", "/v1/referrals/#{seg(id)}/void", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Reward a partner. POST /v1/rewards
+    #
+    # Rewards a partner for something outside a sale (a community answer, an event): one `earned` commission line that is approved and paid like any other. Name the partner by `partnerId` or `partnerExternalRef`; the amount is `amountMinor` (+ `currency`) or comes from a rule (`ruleKey`, or the `event` a rule maps). Idempotent on `idempotencyKey`: a retry returns the first grant with 200; the same key with a different request is 409.
+    #
+    # **Auth:** an API key with `commissions:write` (or `full`), or a session with role `owner`, `admin`, `finance`.
+    def post_rewards(body, idempotency_key: nil)
+      request("POST", "/v1/rewards", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Redeem a reward. POST /v1/rewards/{id}/redeem
     #
     # Records a (possibly partial) redemption: `amountMinor` (default the remaining balance) is capped at what's left, and the reward becomes `redeemed` once it is used up. `externalId` makes it idempotent (409 if reused for another reward). Publishes `credit.redeemed`.
@@ -3867,6 +4211,24 @@ module Referalli
     # **Auth:** an API key with `billing:write` (or `full`), or a session with role `owner`, `admin`.
     def post_sandbox_simulate(body, idempotency_key: nil)
       request("POST", "/v1/sandbox/simulate", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Preview a support card. POST /v1/support/apps/{adapter}/test
+    #
+    # Renders what the tool would show for a contact, from your own session: the context and the tool-format card. Nothing is sent to the tool.
+    #
+    # **Auth:** an API key with `partners:write` (or `full`), or a session with role `owner`, `admin`.
+    def post_support_apps_adapter_test(adapter, body, idempotency_key: nil)
+      request("POST", "/v1/support/apps/#{seg(adapter)}/test", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Render a support card for a tool. POST /v1/support/cards/{orgId}/{adapter}
+    #
+    # Called by the support tool, signed in its own scheme (Chatly `x-chatly-signature`, Intercom `X-Body-Signature`, HubSpot v3, Front, Help Scout, a Zendesk app JWT, or the custom `X-Referalli-Signature`). Answers the tool's card format. An unknown org, a tool that is not connected, or a bad or stale signature all answer 404.
+    #
+    # **Auth:** none.
+    def post_support_cards_org_id_adapter(org_id, adapter, body, idempotency_key: nil)
+      request("POST", "/v1/support/cards/#{seg(org_id)}/#{seg(adapter)}", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
     # File a corrected 1099. POST /v1/tax/1099/documents/{id}/correct
@@ -3952,11 +4314,22 @@ module Referalli
 
     # Create a webhook endpoint. POST /v1/webhook-endpoints
     #
-    # Subscribes an HTTPS URL to event topics (default `["*"]`, every event; see the `webhooks` section of this document for each topic's payload). `programIds` limits it to events about those programs (org-wide events such as payouts are then not sent). Deliveries are signed the Standard Webhooks way with the returned `secret` (`whsec_…`), shown only here. `legacySignature: true` also sends the deprecated body-only signature.
+    # Subscribes an HTTPS URL to event topics (default `["*"]`, every event; see the `webhooks` section of this document for each topic's payload). `programIds` limits it to events about those programs (org-wide events such as payouts are then not sent). Deliveries are signed the Standard Webhooks way with the returned `secret` (`whsec_…`), shown only here. `legacySignature: true` also sends the deprecated body-only signature. `alertContacts` (up to 10 emails) are emailed, with the org owner, when the endpoint has failed for 1 hour and again at 24 hours; it is disabled after 72 hours of failures or 1,000 failed attempts in a row.
     #
     # **Auth:** an API key with `webhooks:write` (or `full`), or a session with role `owner`, `admin`.
     def post_webhook_endpoints(body, idempotency_key: nil)
       request("POST", "/v1/webhook-endpoints", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Replay failed deliveries. POST /v1/webhook-endpoints/{id}/replay
+    #
+    # Requeues the endpoint's failed deliveries created at or after `since` (ISO 8601), for after an outage. Each keeps its `webhook-id`, so receivers can dedupe. Audited.
+    #
+    # **Auth:** an API key with `webhooks:write` (or `full`), or a session with role `owner`, `admin`.
+    #
+    # since: Requeue failed deliveries created at or after this time.
+    def post_webhook_endpoints_id_replay(id, since:, idempotency_key: nil)
+      request("POST", "/v1/webhook-endpoints/#{seg(id)}/replay", query: { "since" => since }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Rotate an endpoint secret. POST /v1/webhook-endpoints/{id}/rotate-secret
@@ -3995,6 +4368,15 @@ module Referalli
       request("POST", "/v1/zapier/hooks", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Set a vendor-issued secret. PUT /v1/auth/connections/{id}/secret
+    #
+    # For webhook connectors whose vendor issues the signing secret (Clerk, Stytch, WorkOS) or key set (Kinde's JWKS document): replaces the connection's secret. The previous one keeps verifying for 24 hours. Signed-protocol connections rotate instead. Audited.
+    #
+    # **Auth:** an API key with `integrations:write` (or `full`), or a session with role `owner`, `admin`.
+    def put_auth_connections_id_secret(id, body, idempotency_key: nil)
+      request("PUT", "/v1/auth/connections/#{seg(id)}/secret", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Set provider API credentials. PUT /v1/billing/connections/{id}/credentials
     #
     # For providers that send thin webhooks (Recurly, BigCommerce), the API credentials used to fetch the full event: `apiKey`, or `apiToken` plus `storeHash`, and `region`. Stored encrypted. 400 for providers that take no credentials or when a required field is missing. Audited.
@@ -4024,7 +4406,7 @@ module Referalli
 
     # Update branding. PUT /v1/branding
     #
-    # Sets the logo URL, theme (only the documented `--r-*` tokens, with plain CSS values) and email sender. Omitted fields keep their value.
+    # Sets the logo URL, theme (only the documented `--r-*` tokens, with plain CSS values) and email sender. Omitted fields keep their value. `warnings` lists theme text/background pairs (`--r-accent-ink` on `--r-accent`, `--r-ink` on `--r-paper`) below the 4.5:1 WCAG AA contrast; the theme is saved anyway.
     #
     # **Auth:** an API key with `org:write` (or `full`), or a session with role `owner`, `admin`.
     def put_branding(body, idempotency_key: nil)
@@ -4112,6 +4494,15 @@ module Referalli
       request("PUT", "/v1/org/fx-feed", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Set the hosted-page consent and chat. PUT /v1/org/hosted-pages
+    #
+    # Validates and saves the adapters. A CMP's `scriptUrl` must be https on that vendor's own hosts; `custom` needs every origin listed. `customOrigins` adds origins per CSP directive (https or wss, no wildcards, no keywords). Owner or admin. Audited.
+    #
+    # **Auth:** an API key with `org:write` (or `full`), or a session with role `owner`, `admin`.
+    def put_org_hosted_pages(body, idempotency_key: nil)
+      request("PUT", "/v1/org/hosted-pages", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Set the org payout schedule. PUT /v1/org/payout-schedule
     #
     # When payouts run automatically for every program without its own schedule: a `schedule` (`monthly`, `weekly`, `twice_monthly` or `custom` dates), the older `dayOfMonth` form, or `null` to turn automatic payouts off. Send exactly one of `schedule` and `dayOfMonth`. Audited.
@@ -4119,6 +4510,15 @@ module Referalli
     # **Auth:** an API key with `payouts:write` (or `full`), or a session with role `owner`, `admin`, `finance`.
     def put_org_payout_schedule(body, idempotency_key: nil)
       request("PUT", "/v1/org/payout-schedule", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Set partner sign-in. PUT /v1/org/portal-auth
+    #
+    # Chooses the portal sign-in adapter and its settings. `custom`: `issuer`, `jwksUrl` (https), optional `loginUrl` (your page that mints the token) and `autoEnrollProgramId`. `oidc`: `issuer`, `clientId`, `clientSecret`. `referalli` removes any configuration. Owner only.
+    #
+    # **Auth:** an API key with `org:write` (or `full`), or a session with role `owner`.
+    def put_org_portal_auth(body, idempotency_key: nil)
+      request("PUT", "/v1/org/portal-auth", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Set referral query parameters. PUT /v1/org/referral-params
@@ -4139,6 +4539,15 @@ module Referalli
       request("PUT", "/v1/org/retention", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Connect your own identity provider. PUT /v1/org/sso/direct
+    #
+    # Team SSO with the org's own IdP, no broker: `adapter` `oidc` (issuer, client id and secret, the claim that holds roles) or `workos` (client id, organization id, the org's own API key). `roleMapping` maps IdP groups or roles to `admin`, `finance`, `analyst` or `support` (never owner); `defaultRole` covers everyone else, or null to keep them out; `domains` are the email domains "require SSO" applies to. The secret is encrypted and never returned; leave it out to keep the stored one. 409 while the org uses the Atlas broker. Owner only.
+    #
+    # **Auth:** an API key with `org:write` (or `full`), or a session with role `owner`.
+    def put_org_sso_direct(body, idempotency_key: nil)
+      request("PUT", "/v1/org/sso/direct", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Connect a 1099 filing provider. PUT /v1/org/tax-filing
     #
     # Chooses who e-files 1099-NEC forms: `test` (simulated) or `tax1099` with your own API key (stored encrypted). Audited.
@@ -4155,6 +4564,15 @@ module Referalli
     # **Auth:** an API key with `org:write` (or `full`), or a session with role `owner`, `admin`, `finance`.
     def put_org_tax_profile(body, idempotency_key: nil)
       request("PUT", "/v1/org/tax-profile", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Set the tracker's consent default. PUT /v1/org/tracking-consent
+    #
+    # Sets the consent default served inside `/t/{token}/aff.js` (cached up to 5 minutes). Owner or admin. Audited.
+    #
+    # **Auth:** an API key with `org:write` (or `full`), or a session with role `owner`, `admin`.
+    def put_org_tracking_consent(body, idempotency_key: nil)
+      request("PUT", "/v1/org/tracking-consent", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Set my email language (partner). PUT /v1/partner/locale
@@ -4301,21 +4719,44 @@ module Referalli
       request("PUT", "/v1/programs/#{seg(id)}/referee-reward", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Save a reward rule. PUT /v1/rewards/rules/{key}
+    #
+    # Creates or replaces a rule: the amount, the reason, an optional program and an optional `event` it rewards (one rule per event).
+    #
+    # **Auth:** an API key with `commissions:write` (or `full`), or a session with role `owner`, `admin`.
+    def put_rewards_rules_key(key, body, idempotency_key: nil)
+      request("PUT", "/v1/rewards/rules/#{seg(key)}", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Connect a support tool. PUT /v1/support/apps/{adapter}
+    #
+    # Enable a support tool and store its signing secret (vendor-issued; write-only) or, for Zendesk, the app public key in `config.publicKeyPem`. For `custom` Referalli mints the secret: it is returned once, and `rotate: true` mints a new one.
+    #
+    # **Auth:** an API key with `partners:write` (or `full`), or a session with role `owner`, `admin`.
+    def put_support_apps_adapter(adapter, body, idempotency_key: nil)
+      request("PUT", "/v1/support/apps/#{seg(adapter)}", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Every operation: id => [method, path, path params, [[wire, ruby]] query params, body?, response kind, method name].
     OPERATIONS = {
       "deleteApiKeysId" => ["DELETE", "/v1/api-keys/{id}", ["id"], [["cascade","cascade"],["pair","pair"]], false, :json, :delete_api_keys_id],
       "deleteAssetsId" => ["DELETE", "/v1/assets/{id}", ["id"], [], false, :json, :delete_assets_id],
       "deleteAuthConnectionsId" => ["DELETE", "/v1/auth/connections/{id}", ["id"], [], false, :json, :delete_auth_connections_id],
       "deleteBillingConnectionsId" => ["DELETE", "/v1/billing/connections/{id}", ["id"], [], false, :json, :delete_billing_connections_id],
+      "deleteBillingInternalCustomersCustomerRef" => ["DELETE", "/v1/billing/internal-customers/{customerRef}", ["customerRef"], [], false, :json, :delete_billing_internal_customers_customer_ref],
       "deleteBrandingDomain" => ["DELETE", "/v1/branding/domain", [], [], false, :json, :delete_branding_domain],
       "deleteBrandingLinkDomain" => ["DELETE", "/v1/branding/link-domain", [], [], false, :json, :delete_branding_link_domain],
       "deleteCliListenersId" => ["DELETE", "/v1/cli/listeners/{id}", ["id"], [], false, :json, :delete_cli_listeners_id],
       "deleteEmailTemplatesEventLocale" => ["DELETE", "/v1/email/templates/{event}/{locale}", ["event","locale"], [], false, :json, :delete_email_templates_event_locale],
       "deleteIntegrationsKind" => ["DELETE", "/v1/integrations/{kind}", ["kind"], [], false, :json, :delete_integrations_kind],
       "deleteOrgMembersUserId" => ["DELETE", "/v1/org/members/{userId}", ["userId"], [], false, :json, :delete_org_members_user_id],
+      "deleteOrgSsoDirect" => ["DELETE", "/v1/org/sso/direct", [], [], false, :json, :delete_org_sso_direct],
       "deletePartnersId" => ["DELETE", "/v1/partners/{id}", ["id"], [], false, :json, :delete_partners_id],
       "deletePayoutConnectionsProvider" => ["DELETE", "/v1/payout-connections/{provider}", ["provider"], [], false, :json, :delete_payout_connections_provider],
+      "deletePrivacyExecutorsAdapter" => ["DELETE", "/v1/privacy/executors/{adapter}", ["adapter"], [], false, :json, :delete_privacy_executors_adapter],
       "deleteProfitabilityProductsProductRef" => ["DELETE", "/v1/profitability/products/{productRef}", ["productRef"], [], false, :json, :delete_profitability_products_product_ref],
+      "deleteRewardsRulesKey" => ["DELETE", "/v1/rewards/rules/{key}", ["key"], [], false, :json, :delete_rewards_rules_key],
+      "deleteSupportAppsAdapter" => ["DELETE", "/v1/support/apps/{adapter}", ["adapter"], [], false, :json, :delete_support_apps_adapter],
       "deleteWebhookEndpointsId" => ["DELETE", "/v1/webhook-endpoints/{id}", ["id"], [], false, :json, :delete_webhook_endpoints_id],
       "deleteZapierHooksId" => ["DELETE", "/v1/zapier/hooks/{id}", ["id"], [], false, :json, :delete_zapier_hooks_id],
       "getAdminMetrics" => ["GET", "/v1/admin/metrics", [], [], false, :json, :get_admin_metrics],
@@ -4336,14 +4777,19 @@ module Referalli
       "getAuditLogs" => ["GET", "/v1/audit-logs", [], [["actor","actor"],["actorType","actor_type"],["action","action"],["subjectType","subject_type"],["subjectId","subject_id"],["created[gte]","created_gte"],["created[lte]","created_lte"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"]], false, :list, :get_audit_logs],
       "getAuthConnections" => ["GET", "/v1/auth/connections", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_auth_connections],
       "getAuthConnectionsIdExport" => ["GET", "/v1/auth/connections/{id}/export", ["id"], [["customerRef","customer_ref"]], false, :json, :get_auth_connections_id_export],
+      "getAuthConnectionsProviders" => ["GET", "/v1/auth/connections/providers", [], [], false, :json, :get_auth_connections_providers],
       "getAuthProviders" => ["GET", "/v1/auth/providers", [], [], false, :json, :get_auth_providers],
       "getBillingConnections" => ["GET", "/v1/billing/connections", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_billing_connections],
       "getBillingConnectionsId" => ["GET", "/v1/billing/connections/{id}", ["id"], [], false, :json, :get_billing_connections_id],
-      "getBillingEvents" => ["GET", "/v1/billing/events", [], [["customerRef","customer_ref"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_billing_events],
+      "getBillingEvents" => ["GET", "/v1/billing/events", [], [["customerRef","customer_ref"],["status","status"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_billing_events],
+      "getBillingInternalCustomers" => ["GET", "/v1/billing/internal-customers", [], [], false, :json, :get_billing_internal_customers],
       "getBillingPlan" => ["GET", "/v1/billing/plan", [], [], false, :json, :get_billing_plan],
       "getBranding" => ["GET", "/v1/branding", [], [], false, :json, :get_branding],
+      "getChatlyIdentity" => ["GET", "/v1/chatly/identity", [], [], false, :json, :get_chatly_identity],
       "getCleanroomConsent" => ["GET", "/v1/cleanroom/consent", [], [["customerRef","customer_ref"]], false, :json, :get_cleanroom_consent],
       "getCleanroomQuery" => ["GET", "/v1/cleanroom/query", [], [["dimension","dimension"]], false, :json, :get_cleanroom_query],
+      "getClicksConsentCoverage" => ["GET", "/v1/clicks/consent-coverage", [], [["days","days"]], false, :json, :get_clicks_consent_coverage],
+      "getClicksId" => ["GET", "/v1/clicks/{id}", ["id"], [], false, :json, :get_clicks_id],
       "getCliDeviceCodesUserCode" => ["GET", "/v1/cli/device-codes/{userCode}", ["userCode"], [], false, :json, :get_cli_device_codes_user_code],
       "getCliListenersIdEvents" => ["GET", "/v1/cli/listeners/{id}/events", ["id"], [["wait","wait"]], false, :json, :get_cli_listeners_id_events],
       "getCliLogs" => ["GET", "/v1/cli/logs", [], [["after","after"],["wait","wait"],["limit","limit"]], false, :json, :get_cli_logs],
@@ -4359,7 +4805,9 @@ module Referalli
       "getDisputes" => ["GET", "/v1/disputes", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_disputes],
       "getEmailSettings" => ["GET", "/v1/email/settings", [], [], false, :json, :get_email_settings],
       "getEmailTemplates" => ["GET", "/v1/email/templates", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_email_templates],
+      "getEmbed" => ["GET", "/v1/embed", [], [["token","token"]], false, :json, :get_embed],
       "getEmbedSummary" => ["GET", "/v1/embed/summary", [], [], false, :json, :get_embed_summary],
+      "getEvents" => ["GET", "/v1/events", [], [["since","since"],["topics","topics"],["after","after"],["limit","limit"]], false, :json, :get_events],
       "getExportAccounting" => ["GET", "/v1/export/accounting", [], [["format","format"],["year","year"]], false, :text, :get_export_accounting],
       "getExportFull" => ["GET", "/v1/export/full", [], [], false, :text, :get_export_full],
       "getFraudCases" => ["GET", "/v1/fraud/cases", [], [["status","status"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_fraud_cases],
@@ -4369,6 +4817,7 @@ module Referalli
       "getHostsCurrent" => ["GET", "/v1/hosts/current", [], [], false, :json, :get_hosts_current],
       "getHostsCurrentThemeCss" => ["GET", "/v1/hosts/current/theme.css", [], [], false, :text, :get_hosts_current_theme_css],
       "getIncrementality" => ["GET", "/v1/incrementality", [], [["programId","program_id"]], false, :json, :get_incrementality],
+      "getIntegrationHealth" => ["GET", "/v1/integration-health", [], [], false, :json, :get_integration_health],
       "getIntegrations" => ["GET", "/v1/integrations", [], [], false, :json, :get_integrations],
       "getIntegrationsDeliveries" => ["GET", "/v1/integrations/deliveries", [], [["kind","kind"],["status","status"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_integrations_deliveries],
       "getInvitations" => ["GET", "/v1/invitations", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_invitations],
@@ -4385,13 +4834,16 @@ module Referalli
       "getOpenapiYaml" => ["GET", "/v1/openapi.yaml", [], [], false, :text, :get_openapi_yaml],
       "getOrg" => ["GET", "/v1/org", [], [], false, :json, :get_org],
       "getOrgFxFeed" => ["GET", "/v1/org/fx-feed", [], [], false, :json, :get_org_fx_feed],
+      "getOrgHostedPages" => ["GET", "/v1/org/hosted-pages", [], [], false, :json, :get_org_hosted_pages],
       "getOrgMembers" => ["GET", "/v1/org/members", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_org_members],
       "getOrgPayoutSchedule" => ["GET", "/v1/org/payout-schedule", [], [], false, :json, :get_org_payout_schedule],
+      "getOrgPortalAuth" => ["GET", "/v1/org/portal-auth", [], [], false, :json, :get_org_portal_auth],
       "getOrgReferralParams" => ["GET", "/v1/org/referral-params", [], [], false, :json, :get_org_referral_params],
       "getOrgRetention" => ["GET", "/v1/org/retention", [], [], false, :json, :get_org_retention],
       "getOrgSso" => ["GET", "/v1/org/sso", [], [], false, :json, :get_org_sso],
       "getOrgSsoConnectionsIdSamlMetadata" => ["GET", "/v1/org/sso/connections/{id}/saml-metadata", ["id"], [], false, :json, :get_org_sso_connections_id_saml_metadata],
       "getOrgTaxProfile" => ["GET", "/v1/org/tax-profile", [], [], false, :json, :get_org_tax_profile],
+      "getOrgTrackingConsent" => ["GET", "/v1/org/tracking-consent", [], [], false, :json, :get_org_tracking_consent],
       "getOutreach" => ["GET", "/v1/outreach", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_outreach],
       "getPartnerAchievements" => ["GET", "/v1/partner/achievements", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_partner_achievements],
       "getPartnerAdvance" => ["GET", "/v1/partner/advance", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_partner_advance],
@@ -4435,6 +4887,10 @@ module Referalli
       "getPayoutRuns" => ["GET", "/v1/payout-runs", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_payout_runs],
       "getPayouts" => ["GET", "/v1/payouts", [], [["partnerId","partner_id"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_payouts],
       "getPayoutsIdInvoice" => ["GET", "/v1/payouts/{id}/invoice", ["id"], [["format","format"]], false, :json, :get_payouts_id_invoice],
+      "getPlans" => ["GET", "/v1/plans", [], [], false, :json, :get_plans],
+      "getPortalAuthCurrent" => ["GET", "/v1/portal-auth/current", [], [["org","org"]], false, :json, :get_portal_auth_current],
+      "getPrivacyExecutorRequests" => ["GET", "/v1/privacy/executor-requests", [], [], false, :json, :get_privacy_executor_requests],
+      "getPrivacyExecutors" => ["GET", "/v1/privacy/executors", [], [], false, :json, :get_privacy_executors],
       "getPrivacyExport" => ["GET", "/v1/privacy/export", [], [["customerRef","customer_ref"]], false, :json, :get_privacy_export],
       "getPrivacyRequests" => ["GET", "/v1/privacy/requests", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_privacy_requests],
       "getPrivacyRequestsId" => ["GET", "/v1/privacy/requests/{id}", ["id"], [], false, :json, :get_privacy_requests_id],
@@ -4461,7 +4917,9 @@ module Referalli
       "getReportsFilteredClicks" => ["GET", "/v1/reports/filtered-clicks", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_reports_filtered_clicks],
       "getReportsPartnerPerformance" => ["GET", "/v1/reports/partner-performance", [], [["format","format"]], false, :json, :get_reports_partner_performance],
       "getRewards" => ["GET", "/v1/rewards", [], [["status","status"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_rewards],
+      "getRewardsGranted" => ["GET", "/v1/rewards/granted", [], [], false, :json, :get_rewards_granted],
       "getRewardsLookupCode" => ["GET", "/v1/rewards/lookup/{code}", ["code"], [], false, :json, :get_rewards_lookup_code],
+      "getRewardsRules" => ["GET", "/v1/rewards/rules", [], [], false, :json, :get_rewards_rules],
       "getRoiBreakdown" => ["GET", "/v1/roi/breakdown", [], [["from","from"],["to","to"],["programId","program_id"],["partnerId","partner_id"],["windowDays","window_days"],["currency","currency"],["format","format"],["by","by"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_roi_breakdown],
       "getRoiDataQuality" => ["GET", "/v1/roi/data-quality", [], [["from","from"],["to","to"],["format","format"]], false, :json, :get_roi_data_quality],
       "getRoiGrants" => ["GET", "/v1/roi/grants", [], [["from","from"],["to","to"],["programId","program_id"],["partnerId","partner_id"],["windowDays","window_days"],["currency","currency"],["format","format"],["status","status"],["role","role"],["paidBack","paid_back"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_roi_grants],
@@ -4475,6 +4933,9 @@ module Referalli
       "getStatusIncidents" => ["GET", "/v1/status/incidents", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_status_incidents],
       "getStatusIncidentsAtom" => ["GET", "/v1/status/incidents.atom", [], [], false, :text, :get_status_incidents_atom],
       "getStatusIncidentsId" => ["GET", "/v1/status/incidents/{id}", ["id"], [], false, :json, :get_status_incidents_id],
+      "getSupportApps" => ["GET", "/v1/support/apps", [], [], false, :json, :get_support_apps],
+      "getSupportCardsOrgIdAdapter" => ["GET", "/v1/support/cards/{orgId}/{adapter}", ["orgId","adapter"], [["email","email"],["externalId","external_id"]], false, :json, :get_support_cards_org_id_adapter],
+      "getSupportContext" => ["GET", "/v1/support/context", [], [["email","email"],["customerRef","customer_ref"],["partnerExternalRef","partner_external_ref"],["ext","ext"]], false, :json, :get_support_context],
       "getTax1099" => ["GET", "/v1/tax/1099", [], [["year","year"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_tax1099],
       "getTax1099Filings" => ["GET", "/v1/tax/1099/filings", [], [["year","year"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_tax1099_filings],
       "getTax1099Preview" => ["GET", "/v1/tax/1099/preview", [], [["year","year"]], false, :json, :get_tax1099_preview],
@@ -4503,6 +4964,7 @@ module Referalli
       "patchProgramsId" => ["PATCH", "/v1/programs/{id}", ["id"], [], true, :json, :patch_programs_id],
       "patchReferralsId" => ["PATCH", "/v1/referrals/{id}", ["id"], [], true, :json, :patch_referrals_id],
       "patchWebhookEndpointsId" => ["PATCH", "/v1/webhook-endpoints/{id}", ["id"], [], true, :json, :patch_webhook_endpoints_id],
+      "postAccountClose" => ["POST", "/v1/account/close", [], [], true, :json, :post_account_close],
       "postAdminOrgsIdPlan" => ["POST", "/v1/admin/orgs/{id}/plan", ["id"], [], true, :json, :post_admin_orgs_id_plan],
       "postAdminOrgsIdSuspend" => ["POST", "/v1/admin/orgs/{id}/suspend", ["id"], [], true, :json, :post_admin_orgs_id_suspend],
       "postAdminOrgsIdUnsuspend" => ["POST", "/v1/admin/orgs/{id}/unsuspend", ["id"], [], false, :json, :post_admin_orgs_id_unsuspend],
@@ -4515,21 +4977,25 @@ module Referalli
       "postApiKeys" => ["POST", "/v1/api-keys", [], [], true, :json, :post_api_keys],
       "postAssets" => ["POST", "/v1/assets", [], [], true, :json, :post_assets],
       "postAttributionReplay" => ["POST", "/v1/attribution/replay", [], [], true, :json, :post_attribution_replay],
+      "postAuthBackchannelLogout" => ["POST", "/v1/auth/backchannel-logout", [], [], true, :json, :post_auth_backchannel_logout],
       "postAuthConnections" => ["POST", "/v1/auth/connections", [], [], true, :json, :post_auth_connections],
       "postAuthConnectionsIdAliases" => ["POST", "/v1/auth/connections/{id}/aliases", ["id"], [], true, :json, :post_auth_connections_id_aliases],
       "postAuthConnectionsIdErase" => ["POST", "/v1/auth/connections/{id}/erase", ["id"], [], true, :json, :post_auth_connections_id_erase],
+      "postAuthConnectionsIdPartners" => ["POST", "/v1/auth/connections/{id}/partners", ["id"], [], true, :json, :post_auth_connections_id_partners],
       "postAuthConnectionsIdPing" => ["POST", "/v1/auth/connections/{id}/ping", ["id"], [], true, :json, :post_auth_connections_id_ping],
       "postAuthConnectionsIdRevokePreviousSecret" => ["POST", "/v1/auth/connections/{id}/revoke-previous-secret", ["id"], [], false, :json, :post_auth_connections_id_revoke_previous_secret],
       "postAuthConnectionsIdRotateSecret" => ["POST", "/v1/auth/connections/{id}/rotate-secret", ["id"], [], false, :json, :post_auth_connections_id_rotate_secret],
       "postAuthConnectionsIdSignals" => ["POST", "/v1/auth/connections/{id}/signals", ["id"], [], true, :json, :post_auth_connections_id_signals],
       "postAuthConnectionsIdSignups" => ["POST", "/v1/auth/connections/{id}/signups", ["id"], [], true, :json, :post_auth_connections_id_signups],
       "postAuthConnectionsIdUsers" => ["POST", "/v1/auth/connections/{id}/users", ["id"], [], true, :json, :post_auth_connections_id_users],
+      "postAuthConnectionsInstall" => ["POST", "/v1/auth/connections/install", [], [], true, :json, :post_auth_connections_install],
       "postAuthLogout" => ["POST", "/v1/auth/logout", [], [], false, :json, :post_auth_logout],
       "postBillingActivate" => ["POST", "/v1/billing/activate", [], [], true, :json, :post_billing_activate],
       "postBillingCheckout" => ["POST", "/v1/billing/checkout", [], [], true, :json, :post_billing_checkout],
       "postBillingConnections" => ["POST", "/v1/billing/connections", [], [], true, :json, :post_billing_connections],
       "postBillingConnectionsIdRotateSecret" => ["POST", "/v1/billing/connections/{id}/rotate-secret", ["id"], [], false, :json, :post_billing_connections_id_rotate_secret],
       "postBillingConnectionsIdValueMappingPreview" => ["POST", "/v1/billing/connections/{id}/value-mapping/preview", ["id"], [], true, :json, :post_billing_connections_id_value_mapping_preview],
+      "postBillingInternalCustomers" => ["POST", "/v1/billing/internal-customers", [], [], true, :json, :post_billing_internal_customers],
       "postBillingPortal" => ["POST", "/v1/billing/portal", [], [], false, :json, :post_billing_portal],
       "postBrandingDomain" => ["POST", "/v1/branding/domain", [], [], true, :json, :post_branding_domain],
       "postBrandingDomainVerify" => ["POST", "/v1/branding/domain/verify", [], [], false, :json, :post_branding_domain_verify],
@@ -4574,9 +5040,13 @@ module Referalli
       "postLinks" => ["POST", "/v1/links", [], [], true, :json, :post_links],
       "postMobilePurchases" => ["POST", "/v1/mobile/purchases", [], [], true, :json, :post_mobile_purchases],
       "postNotificationsIdRead" => ["POST", "/v1/notifications/{id}/read", ["id"], [], false, :json, :post_notifications_id_read],
+      "postOauthToken" => ["POST", "/v1/oauth/token", [], [], true, :json, :post_oauth_token],
       "postOnchainConnections" => ["POST", "/v1/onchain/connections", [], [], true, :json, :post_onchain_connections],
+      "postOrgHostedPagesCheck" => ["POST", "/v1/org/hosted-pages/check", [], [], false, :json, :post_org_hosted_pages_check],
       "postOrgMembers" => ["POST", "/v1/org/members", [], [], true, :json, :post_org_members],
+      "postOrgPortalAuthTest" => ["POST", "/v1/org/portal-auth/test", [], [], false, :json, :post_org_portal_auth_test],
       "postOrgs" => ["POST", "/v1/orgs", [], [], true, :json, :post_orgs],
+      "postOrgSsoDirectTest" => ["POST", "/v1/org/sso/direct/test", [], [], false, :json, :post_org_sso_direct_test],
       "postOrgSsoLink" => ["POST", "/v1/org/sso/link", [], [], false, :json, :post_org_sso_link],
       "postOrgSsoTickets" => ["POST", "/v1/org/sso/tickets", [], [], true, :json, :post_org_sso_tickets],
       "postOrgSsoTicketsIdRevoke" => ["POST", "/v1/org/sso/tickets/{id}/revoke", ["id"], [], false, :json, :post_org_sso_tickets_id_revoke],
@@ -4609,6 +5079,8 @@ module Referalli
       "postPayoutRunsIdCancel" => ["POST", "/v1/payout-runs/{id}/cancel", ["id"], [], false, :json, :post_payout_runs_id_cancel],
       "postPayoutRunsIdExecute" => ["POST", "/v1/payout-runs/{id}/execute", ["id"], [], false, :json, :post_payout_runs_id_execute],
       "postPayoutRunsRunScheduled" => ["POST", "/v1/payout-runs/run-scheduled", [], [], false, :json, :post_payout_runs_run_scheduled],
+      "postPrivacyExecutorKeys" => ["POST", "/v1/privacy/executor-keys", [], [], true, :json, :post_privacy_executor_keys],
+      "postPrivacyExecutorsAdapterCheck" => ["POST", "/v1/privacy/executors/{adapter}/check", ["adapter"], [], false, :json, :post_privacy_executors_adapter_check],
       "postPrivacyForget" => ["POST", "/v1/privacy/forget", [], [], true, :json, :post_privacy_forget],
       "postPrivacyLookup" => ["POST", "/v1/privacy/lookup", [], [], true, :json, :post_privacy_lookup],
       "postPrivacyRequests" => ["POST", "/v1/privacy/requests", [], [], true, :json, :post_privacy_requests],
@@ -4628,10 +5100,13 @@ module Referalli
       "postReferralsIdApprove" => ["POST", "/v1/referrals/{id}/approve", ["id"], [], false, :json, :post_referrals_id_approve],
       "postReferralsIdReassign" => ["POST", "/v1/referrals/{id}/reassign", ["id"], [], true, :json, :post_referrals_id_reassign],
       "postReferralsIdVoid" => ["POST", "/v1/referrals/{id}/void", ["id"], [], false, :json, :post_referrals_id_void],
+      "postRewards" => ["POST", "/v1/rewards", [], [], true, :json, :post_rewards],
       "postRewardsIdRedeem" => ["POST", "/v1/rewards/{id}/redeem", ["id"], [], true, :json, :post_rewards_id_redeem],
       "postRewardsRedeemByCode" => ["POST", "/v1/rewards/redeem-by-code", [], [], true, :json, :post_rewards_redeem_by_code],
       "postRoiPatternsPatternReview" => ["POST", "/v1/roi/patterns/{pattern}/review", ["pattern"], [], true, :json, :post_roi_patterns_pattern_review],
       "postSandboxSimulate" => ["POST", "/v1/sandbox/simulate", [], [], true, :json, :post_sandbox_simulate],
+      "postSupportAppsAdapterTest" => ["POST", "/v1/support/apps/{adapter}/test", ["adapter"], [], true, :json, :post_support_apps_adapter_test],
+      "postSupportCardsOrgIdAdapter" => ["POST", "/v1/support/cards/{orgId}/{adapter}", ["orgId","adapter"], [], true, :json, :post_support_cards_org_id_adapter],
       "postTax1099DocumentsIdCorrect" => ["POST", "/v1/tax/1099/documents/{id}/correct", ["id"], [], false, :json, :post_tax1099_documents_id_correct],
       "postTax1099Filings" => ["POST", "/v1/tax/1099/filings", [], [], true, :json, :post_tax1099_filings],
       "postTax1099FilingsIdRefresh" => ["POST", "/v1/tax/1099/filings/{id}/refresh", ["id"], [], false, :json, :post_tax1099_filings_id_refresh],
@@ -4642,10 +5117,12 @@ module Referalli
       "postValueImport" => ["POST", "/v1/value/import", [], [], true, :json, :post_value_import],
       "postWebhookDeliveriesIdReplay" => ["POST", "/v1/webhook-deliveries/{id}/replay", ["id"], [], false, :json, :post_webhook_deliveries_id_replay],
       "postWebhookEndpoints" => ["POST", "/v1/webhook-endpoints", [], [], true, :json, :post_webhook_endpoints],
+      "postWebhookEndpointsIdReplay" => ["POST", "/v1/webhook-endpoints/{id}/replay", ["id"], [["since","since"]], false, :json, :post_webhook_endpoints_id_replay],
       "postWebhookEndpointsIdRotateSecret" => ["POST", "/v1/webhook-endpoints/{id}/rotate-secret", ["id"], [], false, :json, :post_webhook_endpoints_id_rotate_secret],
       "postWidgetTokens" => ["POST", "/v1/widget/tokens", [], [], true, :json, :post_widget_tokens],
       "postZapierConversions" => ["POST", "/v1/zapier/conversions", [], [], true, :json, :post_zapier_conversions],
       "postZapierHooks" => ["POST", "/v1/zapier/hooks", [], [], true, :json, :post_zapier_hooks],
+      "putAuthConnectionsIdSecret" => ["PUT", "/v1/auth/connections/{id}/secret", ["id"], [], true, :json, :put_auth_connections_id_secret],
       "putBillingConnectionsIdCredentials" => ["PUT", "/v1/billing/connections/{id}/credentials", ["id"], [], true, :json, :put_billing_connections_id_credentials],
       "putBillingConnectionsIdSecret" => ["PUT", "/v1/billing/connections/{id}/secret", ["id"], [], true, :json, :put_billing_connections_id_secret],
       "putBillingConnectionsIdValueMapping" => ["PUT", "/v1/billing/connections/{id}/value-mapping", ["id"], [], true, :json, :put_billing_connections_id_value_mapping],
@@ -4659,11 +5136,15 @@ module Referalli
       "putMeRoiDigest" => ["PUT", "/v1/me/roi-digest", [], [], true, :json, :put_me_roi_digest],
       "putNetworkSettings" => ["PUT", "/v1/network/settings", [], [], true, :json, :put_network_settings],
       "putOrgFxFeed" => ["PUT", "/v1/org/fx-feed", [], [], true, :json, :put_org_fx_feed],
+      "putOrgHostedPages" => ["PUT", "/v1/org/hosted-pages", [], [], true, :json, :put_org_hosted_pages],
       "putOrgPayoutSchedule" => ["PUT", "/v1/org/payout-schedule", [], [], true, :json, :put_org_payout_schedule],
+      "putOrgPortalAuth" => ["PUT", "/v1/org/portal-auth", [], [], true, :json, :put_org_portal_auth],
       "putOrgReferralParams" => ["PUT", "/v1/org/referral-params", [], [], true, :json, :put_org_referral_params],
       "putOrgRetention" => ["PUT", "/v1/org/retention", [], [], true, :json, :put_org_retention],
+      "putOrgSsoDirect" => ["PUT", "/v1/org/sso/direct", [], [], true, :json, :put_org_sso_direct],
       "putOrgTaxFiling" => ["PUT", "/v1/org/tax-filing", [], [], true, :json, :put_org_tax_filing],
       "putOrgTaxProfile" => ["PUT", "/v1/org/tax-profile", [], [], true, :json, :put_org_tax_profile],
+      "putOrgTrackingConsent" => ["PUT", "/v1/org/tracking-consent", [], [], true, :json, :put_org_tracking_consent],
       "putPartnerLocale" => ["PUT", "/v1/partner/locale", [], [], true, :json, :put_partner_locale],
       "putPartnerOrgsOrgIdPayoutProfile" => ["PUT", "/v1/partner/orgs/{orgId}/payout-profile", ["orgId"], [], true, :json, :put_partner_orgs_org_id_payout_profile],
       "putPartnerOrgsOrgIdPostback" => ["PUT", "/v1/partner/orgs/{orgId}/postback", ["orgId"], [], true, :json, :put_partner_orgs_org_id_postback],
@@ -4680,6 +5161,8 @@ module Referalli
       "putProgramsIdPartnersPartnerIdGroup" => ["PUT", "/v1/programs/{id}/partners/{partnerId}/group", ["id","partnerId"], [], true, :json, :put_programs_id_partners_partner_id_group],
       "putProgramsIdPayoutSchedule" => ["PUT", "/v1/programs/{id}/payout-schedule", ["id"], [], true, :json, :put_programs_id_payout_schedule],
       "putProgramsIdRefereeReward" => ["PUT", "/v1/programs/{id}/referee-reward", ["id"], [], true, :json, :put_programs_id_referee_reward],
+      "putRewardsRulesKey" => ["PUT", "/v1/rewards/rules/{key}", ["key"], [], true, :json, :put_rewards_rules_key],
+      "putSupportAppsAdapter" => ["PUT", "/v1/support/apps/{adapter}", ["adapter"], [], true, :json, :put_support_apps_adapter],
     }.freeze
   end
 end
