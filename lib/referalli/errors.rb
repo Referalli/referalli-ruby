@@ -70,6 +70,9 @@ module Referalli
   # `not_found` (HTTP 404).
   class NotFoundError < ApiError; end
 
+  # `not_enrolled` (HTTP 404).
+  class NotEnrolledError < ApiError; end
+
   # `conflict` (HTTP 409).
   class ConflictError < ApiError; end
 
@@ -78,6 +81,9 @@ module Referalli
 
   # `stripe_key_required` (HTTP 409).
   class StripeKeyRequiredError < ApiError; end
+
+  # `credit_credentials_required` (HTTP 409).
+  class CreditCredentialsRequiredError < ApiError; end
 
   # `api_key_expired` (HTTP 409).
   class ApiKeyExpiredError < ApiError; end
@@ -109,6 +115,15 @@ module Referalli
   # `stripe_key_permission` (HTTP 422).
   class StripeKeyPermissionError < ApiError; end
 
+  # `provider_credentials_invalid` (HTTP 422).
+  class ProviderCredentialsInvalidError < ApiError; end
+
+  # `provider_credentials_wrong_mode` (HTTP 422).
+  class ProviderCredentialsWrongModeError < ApiError; end
+
+  # `provider_permission` (HTTP 422).
+  class ProviderPermissionError < ApiError; end
+
   # `payload_too_large` (HTTP 413).
   class PayloadTooLargeError < ApiError; end
 
@@ -126,6 +141,9 @@ module Referalli
 
   # `stripe_unavailable` (HTTP 502).
   class StripeUnavailableError < ApiError; end
+
+  # `provider_unavailable` (HTTP 502).
+  class ProviderUnavailableError < ApiError; end
 
   # `sso_provider_error` (HTTP 502).
   class SsoProviderError < ApiError; end
@@ -148,9 +166,11 @@ module Referalli
     "program_scoped_key" => ProgramScopedKeyError,
     "restricted_session" => RestrictedSessionError,
     "not_found" => NotFoundError,
+    "not_enrolled" => NotEnrolledError,
     "conflict" => ConflictError,
     "idempotency_in_progress" => IdempotencyInProgressError,
     "stripe_key_required" => StripeKeyRequiredError,
+    "credit_credentials_required" => CreditCredentialsRequiredError,
     "api_key_expired" => ApiKeyExpiredError,
     "replay" => ReplayError,
     "live_mode_only" => LiveModeOnlyError,
@@ -161,12 +181,16 @@ module Referalli
     "stripe_key_invalid" => StripeKeyInvalidError,
     "stripe_key_wrong_mode" => StripeKeyWrongModeError,
     "stripe_key_permission" => StripeKeyPermissionError,
+    "provider_credentials_invalid" => ProviderCredentialsInvalidError,
+    "provider_credentials_wrong_mode" => ProviderCredentialsWrongModeError,
+    "provider_permission" => ProviderPermissionError,
     "payload_too_large" => PayloadTooLargeError,
     "connection_paused" => ConnectionPausedError,
     "rate_limited" => RateLimitedError,
     "internal_error" => InternalServerError,
     "atlas_error" => AtlasError,
     "stripe_unavailable" => StripeUnavailableError,
+    "provider_unavailable" => ProviderUnavailableError,
     "sso_provider_error" => SsoProviderError,
     "sso_not_configured" => SsoNotConfiguredError,
   }.freeze

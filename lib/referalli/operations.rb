@@ -42,7 +42,7 @@ module Referalli
 
     # Delete a billing connection. DELETE /v1/billing/connections/{id}
     #
-    # Deletes the connection: its secrets and credentials are wiped and its webhook URL stops accepting events. Recorded billing events stay. Audited.
+    # Deletes the connection: its secrets and credentials are wiped and its webhook URL stops accepting events. Recorded billing events stay. Webhooks registered with `autoRegister` are removed from the provider, best effort, only where the connection kept credentials (BigCommerce): `providerWebhookRemoved` says whether they were. Audited.
     #
     # **Auth:** an API key with `billing:write`, or a session with role `owner`, `admin`.
     #
@@ -612,6 +612,15 @@ module Referalli
     # **Auth:** a signature (see above); no API key.
     def get_auth_connections_id_export(id, customer_ref:, idempotency_key: nil)
       request("GET", "/v1/auth/connections/#{seg(id)}/export", query: { "customerRef" => customer_ref }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Get a user's referral link (signed protocol). GET /v1/auth/connections/{id}/users/{customerRef}/referral
+    #
+    # The user's partner identity in the connection's program, so the platform can keep the link on its own user object: `{ partnerId, code, linkUrl, enrolledAt }`, or `404 not_enrolled`. Sign the query string (empty) as the payload, or use a v2 signature. Signed with the connection secret in `x-referalli-signature: t=<unix>,v1=…,v2=…` (v2 also signs the request line; once a connection has seen v2 it requires it), with a unique `x-referalli-id` per call. The legacy header names from before the rename are also accepted, for existing integrations. Calls older than 5 minutes, reused ids (`409 replay`), paused connections (`423 connection_paused`) and unknown fields (`422`) are refused.
+    #
+    # **Auth:** none.
+    def get_auth_connections_id_users_customer_ref_referral(id, customer_ref, idempotency_key: nil)
+      request("GET", "/v1/auth/connections/#{seg(id)}/users/#{seg(customer_ref)}/referral", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # List identity connectors. GET /v1/auth/connections/providers
@@ -2532,6 +2541,39 @@ module Referalli
       request("GET", "/v1/programs/#{seg(id)}/autopricing", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Get a program's account-credit rail settings. GET /v1/programs/{id}/credit-rail
+    #
+    # The provider-neutral view of the account-credit rail: which billing provider credits go to (`provider`, from the billing connection `connectionId`, or `stripe` with no connection), the same matching and currency settings as the Stripe endpoints, whether credentials are available (`credentialsConnected`) and what the provider supports (`capabilities.customerCurrency`, `capabilities.createCustomer`). Credentials are never returned. A program set up with `PUT /v1/programs/{id}/stripe-credits` reads here as `provider: "stripe"`.
+    #
+    # **Auth:** an API key with `payouts:read`, or a session of any role.
+    #
+    # **Scopes:** `payouts:read`, `payouts:write`, `read`, `full`, `admin`.
+    def get_programs_id_credit_rail(id, idempotency_key: nil)
+      request("GET", "/v1/programs/#{seg(id)}/credit-rail", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # List a program's account credits. GET /v1/programs/{id}/credit-rail/log
+    #
+    # Every credit and debit the rail queued for this program, newest first, provider-neutral: `provider`, `connectionId`, `customerId` (the provider's customer) and `transactionId` (the provider's record once applied) instead of the Stripe-named fields of `GET /v1/programs/{id}/stripe-credits/log`. Statuses and retries as there.
+    #
+    # **Auth:** an API key with `payouts:read`, or a session of any role.
+    #
+    # **Scopes:** `payouts:read`, `payouts:write`, `read`, `full`, `admin`.
+    #
+    # limit: Items per page, 1 to 100 (default 50). From API version 2026-11-01; ignored under 2026-10-21, where lists are a capped plain array.
+    # starting_after: A cursor: the id of an item (the previous page's `next_cursor`); returns the items after it. From API version 2026-11-01; ignored under 2026-10-21, where lists are a capped plain array.
+    # ending_before: A cursor: returns the items before this item id (the previous page). Not with `starting_after`. From API version 2026-11-01; ignored under 2026-10-21, where lists are a capped plain array.
+    # created[gte]: Only items created at or after this time (ISO 8601), on lists of timestamped records. From API version 2026-11-01; ignored under 2026-10-21, where lists are a capped plain array.
+    # created[lte]: Only items created at or before this time (ISO 8601), on lists of timestamped records. From API version 2026-11-01; ignored under 2026-10-21, where lists are a capped plain array.
+    def get_programs_id_credit_rail_log(id, limit: nil, starting_after: nil, ending_before: nil, created_gte: nil, created_lte: nil, idempotency_key: nil)
+      request("GET", "/v1/programs/#{seg(id)}/credit-rail/log", query: { "limit" => limit, "starting_after" => starting_after, "ending_before" => ending_before, "created[gte]" => created_gte, "created[lte]" => created_lte }, body: nil, idempotency_key: idempotency_key, kind: :list)
+    end
+
+    # Every item of #get_programs_id_credit_rail_log, following the pages.
+    def get_programs_id_credit_rail_log_each(id, limit: nil, ending_before: nil, created_gte: nil, created_lte: nil, idempotency_key: nil, &block)
+      paginate(->(cursor) { get_programs_id_credit_rail_log(id, limit: limit, ending_before: ending_before, created_gte: created_gte, created_lte: created_lte, starting_after: cursor, idempotency_key: idempotency_key) }, &block)
+    end
+
     # List program enrollments. GET /v1/programs/{id}/enrollments
     #
     # The program's enrollments and applications, newest first, each with the partner and a cross-network warning when other merchants banned the same account and `externalRef` (this program's own id for the partner, or null). Filter with `status` or `partnerId`.
@@ -3010,9 +3052,20 @@ module Referalli
       request("GET", "/v1/roi/trace/#{seg(customer_ref)}", query: { "windowDays" => window_days, "format" => format }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # List billing event fixtures. GET /v1/sandbox/billing-fixtures
+    #
+    # Test mode only. The provider events `POST /v1/sandbox/billing-fixtures` can send, for every billing provider or the one named by `provider`: the provider-neutral `event` name (`payment.paid`, `payment.refunded`, `payment.disputed`, `subscription.created`, `subscription.canceled`, …), the provider's own `native` name, and the `overrides` fields each uses.
+    #
+    # **Auth:** an API key with `billing:read`, or a session of any role.
+    #
+    # **Scopes:** `billing:read`, `billing:write`, `read`, `full`, `admin`.
+    def get_sandbox_billing_fixtures(provider: nil, idempotency_key: nil)
+      request("GET", "/v1/sandbox/billing-fixtures", query: { "provider" => provider }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # List Stripe event fixtures. GET /v1/sandbox/stripe-fixtures
     #
-    # Test mode only. The Stripe event types `POST /v1/sandbox/stripe-fixtures` can send, each with the `overrides` fields it uses.
+    # Test mode only. The Stripe event types `POST /v1/sandbox/stripe-fixtures` can send, each with the `overrides` fields it uses. Kept for existing callers: `GET /v1/sandbox/billing-fixtures?provider=stripe` lists the same.
     #
     # **Auth:** an API key with `billing:read`, or a session of any role.
     #
@@ -3395,7 +3448,7 @@ module Referalli
 
     # Update an auth connection. PATCH /v1/auth/connections/{id}
     #
-    # Pauses or resumes a connection, renames it, changes `autoEnrollUsers` or the destination of auto-created links, or (signed-protocol connections) sets `signatureVersion`: `v2` to require request-line signatures, `v1+v2` to accept both again.
+    # Pauses or resumes a connection, renames it, changes `autoEnrollUsers` or the destination of auto-created links, turns `resolveBillingCustomers` on or off, or (signed-protocol connections) sets `signatureVersion`: `v2` to require request-line signatures, `v1+v2` to accept both again. `resolveBillingCustomers` (any provider, default false): a billing customer that arrives with no customerRef (no `referalli_customer_ref` metadata, no `customerRefMetadataKey` hit) in a program this connection serves (within the billing connection's `programIds`) is resolved through this connection's users: `referalli_user_id` or `<provider>_user_id` metadata naming a user it reported, else exactly one user whose current email is the customer's and verified. The billing link is recorded as metadata would record it; none or several matches record `ignoredReason: "identity_unresolved"` / `"identity_ambiguous"` on the billing event. Explicit metadata always wins. Matching uses only the org's own data. `tokenVerification` replaces the widget-session verifier (an HS256 secret is kept when `sharedSecret` is left out; `null` removes it) and `allowedOrigins` replaces the origin list.
     #
     # **Auth:** an API key with `integrations:write`, or a session with role `owner`, `admin`.
     #
@@ -3672,7 +3725,7 @@ module Referalli
 
     # Connect an auth platform. POST /v1/auth/connections
     #
-    # Connects your sign-up system so new users are attributed server-side without calling associate: `clerk`, `supabase`, `workos` or `generic` receive the platform's user webhooks at the returned URL; `atlas` and `custom` call the signed protocol endpoints under `/v1/auth/connections/{id}/`. `autoEnrollUsers` makes every new user a partner too. Returns the signing secret once. 409 when an Atlas instance already has a connection.
+    # Connects your sign-up system so new users are attributed server-side without calling associate: `clerk`, `supabase`, `workos` or `generic` receive the platform's user webhooks at the returned URL; `atlas` and `custom` call the signed protocol endpoints under `/v1/auth/connections/{id}/`. `autoEnrollUsers` makes every new user a partner too. `tokenVerification` and `allowedOrigins` let the referral widget run with no server route (`POST /v1/widget/session`); an HS256 `sharedSecret` is sealed and never returned. Returns the signing secret once. 409 when an Atlas instance already has a connection.
     #
     # **Auth:** an API key with `integrations:write`, or a session with role `owner`, `admin`.
     #
@@ -3766,6 +3819,15 @@ module Referalli
       request("POST", "/v1/auth/connections/#{seg(id)}/users", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Mint a widget token for a user (signed protocol). POST /v1/auth/connections/{id}/widget-tokens
+    #
+    # For platforms that hold the connection secret (hosted account pages, sessions that aren't JWTs): a referral-widget token for `customerRef` in the connection's program, the same answer as `POST /v1/widget/session`. With the program's widget `autoEnroll`, a non-partner is enrolled only when `emailVerified` is true; otherwise `404 not_enrolled`. `ttlSeconds` 60 to 3600 (default 900). Signed with the connection secret in `x-referalli-signature: t=<unix>,v1=…,v2=…` (v2 also signs the request line; once a connection has seen v2 it requires it), with a unique `x-referalli-id` per call. The legacy header names from before the rename are also accepted, for existing integrations. Calls older than 5 minutes, reused ids (`409 replay`), paused connections (`423 connection_paused`) and unknown fields (`422`) are refused.
+    #
+    # **Auth:** none.
+    def post_auth_connections_id_widget_tokens(id, body, idempotency_key: nil)
+      request("POST", "/v1/auth/connections/#{seg(id)}/widget-tokens", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Approve a one-click install. POST /v1/auth/connections/install
     #
     # The dashboard's consent step for `GET /v1/oauth/authorize`: `allow` returns the redirect back to the platform with a single-use code (10 minutes) for the chosen program; `deny` returns it with `error=access_denied`. Owner or admin. Audited.
@@ -3810,7 +3872,7 @@ module Referalli
 
     # Create a billing connection. POST /v1/billing/connections
     #
-    # Connects a billing provider (`stripe`, `paddle`, `lemonsqueezy`, `polar`, `chargebee`, `shopify`, `recurly`, `braintree`, `woocommerce`, `bigcommerce` or `generic`) so its payment webhooks become commissions. Returns the `webhookUrl` path to register with the provider and its signing secret (generated unless you pass the provider's own `webhookSecret`); the secret is returned only here. For Stripe, pass `stripeKey` (a restricted key with Webhook Endpoints write and Customers write) instead of `webhookSecret`: Referalli registers a webhook endpoint at this connection's URL on your Stripe account with the events it reads and API version 2025-03-31.basil, stores the signing secret Stripe returns and answers with `stripeWebhookEndpointId`; nothing is saved unless Stripe registered it. If an endpoint on the account already points at one of your Stripe connections, it is updated and that connection returned with `reused: true` (one still `awaiting_secret` gets a fresh endpoint and its secret). `creditRail: { programId, ...settings }` also stores the key as that program's Stripe credit key and applies the `PUT /v1/programs/{id}/stripe-credits` settings (`enabled` defaults to true). The key is never returned and is stored only for `creditRail`. Deleting the connection leaves the Stripe endpoint in place. Errors: `422 stripe_key_wrong_mode`, `422 stripe_key_invalid`, `422 stripe_key_permission`, `502 stripe_unavailable`. A `filter` (`productIds`, `priceIds`, `skus` and/or exact `metadata`) limits which payments and subscription events earn when one provider account sells several products; the rest are recorded as `ignored_by_filter`. `programIds` limits the connection to those programs when one org runs several products: its events earn only through referrals in them, and a payment from a customer referred only in another program earns nothing (the event records `ignoredReason: "no_referral_in_scope"`); null or omitted = every program. A program-scoped API key must send `programIds` within its own. `status` is `awaiting_secret` when a provider that issues its own signing secret (Stripe, Paddle, Polar, Shopify, Recurly, Braintree) is connected without `webhookSecret`: its webhooks fail `401` until `PUT …/secret` stores the provider's secret, then it reads `active`. Audited.
+    # Connects a billing provider (`stripe`, `paddle`, `lemonsqueezy`, `polar`, `chargebee`, `shopify`, `recurly`, `braintree`, `woocommerce`, `bigcommerce` or `generic`) so its payment webhooks become commissions. Returns the `webhookUrl` path to register with the provider and its signing secret (generated unless you pass the provider's own `webhookSecret`); the secret is returned only here. For Stripe, pass `stripeKey` (a restricted key with Webhook Endpoints write and Customers write) instead of `webhookSecret`: Referalli registers a webhook endpoint at this connection's URL on your Stripe account with the events it reads and API version 2025-03-31.basil, stores the signing secret Stripe returns and answers with `stripeWebhookEndpointId`; nothing is saved unless Stripe registered it. If an endpoint on the account already points at one of your Stripe connections, it is updated and that connection returned with `reused: true` (one still `awaiting_secret` gets a fresh endpoint and its secret). `creditRail: { programId, ...settings }` also stores the key as that program's Stripe credit key and applies the `PUT /v1/programs/{id}/stripe-credits` settings (`enabled` defaults to true). The key is never returned and is stored only for `creditRail`. Deleting the connection leaves the Stripe endpoint in place. Errors: `422 stripe_key_wrong_mode`, `422 stripe_key_invalid`, `422 stripe_key_permission`, `502 stripe_unavailable`. `autoRegister: true` with the provider's API `credentials` does the same for Shopify (`shopDomain`, `accessToken`, `apiSecret`), Paddle (`apiKey`), Polar (`accessToken`), Lemon Squeezy (`apiKey`, `storeId`), BigCommerce (`storeHash`, `apiToken`) and WooCommerce (`siteUrl`, `consumerKey`, `consumerSecret`), and for Stripe with `credentials: { secretKey }` (the `stripeKey` path); Chargebee, Recurly and Braintree have no webhook API and are set up by hand. It registers webhooks at this connection's URL with exactly the events Referalli reads, stores the secret that signs them (the provider's, Shopify's app API secret, or one Referalli chooses) and answers `active` with `providerWebhookIds`; a re-run reuses them (`reused: true`), nothing is saved unless the provider registered them, and the credentials are never returned and are kept (sealed) only for BigCommerce, whose connector reads orders with them. Errors: `422 provider_credentials_invalid`, `422 provider_permission`, `502 provider_unavailable`. A `filter` (`productIds`, `priceIds`, `skus` and/or exact `metadata`) limits which payments and subscription events earn when one provider account sells several products; the rest are recorded as `ignored_by_filter`. `programIds` limits the connection to those programs when one org runs several products: its events earn only through referrals in them, and a payment from a customer referred only in another program earns nothing (the event records `ignoredReason: "no_referral_in_scope"`); null or omitted = every program. A program-scoped API key must send `programIds` within its own. `status` is `awaiting_secret` when a provider that issues its own signing secret (Stripe, Paddle, Polar, Shopify, Recurly, Braintree) is connected without `webhookSecret`: its webhooks fail `401` until `PUT …/secret` stores the provider's secret, then it reads `active`. Audited.
     #
     # **Auth:** an API key with `billing:write`, or a session with role `owner`, `admin`.
     #
@@ -4913,6 +4975,17 @@ module Referalli
       request("POST", "/v1/programs/#{seg(id)}/autoprice/run", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Requeue stuck account credits. POST /v1/programs/{id}/credit-rail/requeue
+    #
+    # Same as `POST /v1/programs/{id}/stripe-credits/requeue`, for every provider: resets the attempt count of this program's `no_customer`, `ambiguous_customer` and `fx_rate_missing` rows (all, or only `creditIds`). Owner or admin. Audited.
+    #
+    # **Auth:** an API key with `payouts:write`, or a session with role `owner`, `admin`.
+    #
+    # **Scopes:** `payouts:write`, `full`, `admin`.
+    def post_programs_id_credit_rail_requeue(id, body, idempotency_key: nil)
+      request("POST", "/v1/programs/#{seg(id)}/credit-rail/requeue", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Enroll a partner. POST /v1/programs/{id}/enrollments
     #
     # Enrolls an existing partner in the program, approved at once. Publishes `partner.enrolled`. 409 when already enrolled. `externalRef` is this program's own id for the partner, when their partner `externalRef` belongs to another product sharing the org; this program's webhooks and `GET /v1/partners?externalRef=` then use it. `mint` also gives them a referral code in the program, as `POST /v1/programs/{id}/referrers` does: `coupon: true` a coupon, `link: {}` a tracked link to `link.destinationUrl` or else the program's default destination (`{code}` in it becomes the code; 400 when the program has none and you send none). Their existing code in the program is reused. The response then adds `code` and `linkUrl` (null without a link).
@@ -5109,6 +5182,17 @@ module Referalli
       request("POST", "/v1/roi/patterns/#{seg(pattern)}/review", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Send a billing event fixture. POST /v1/sandbox/billing-fixtures
+    #
+    # Test mode only (`409 test_mode_only` otherwise). Builds a realistic webhook payload for the provider of billing connection `connectionId` (Stripe, Paddle, Lemon Squeezy, Polar, Chargebee, Shopify, Recurly, Braintree, WooCommerce, BigCommerce or the generic contract) and runs it through the same pipeline as a signed webhook to that connection, so you can watch commissions happen without a provider account. `event` is a provider-neutral name (`payment.paid`, `payment.refunded`, `payment.disputed`, `subscription.created`, `subscription.canceled`; Stripe also `subscription.updated`, `customer.created` and `customer.updated`; generic `customer.updated`) or the provider's own event name; `GET /v1/sandbox/billing-fixtures?provider=` lists what each provider has. `overrides` sets `customerRef` (the provider customer id), `amountMinor`, `currency`, `metadata`, `invoiceId` (alias `orderId`: the paid invoice, order or transaction), `subscriptionId` and, for Stripe, `chargeId`; a refund or dispute finds its payment by `invoiceId` (Stripe: `chargeId`), so reuse the paid one. Recurly and BigCommerce fixtures are the enriched payload, so no API credentials are needed. Each call is a new event unless you pass `eventId`, which replays (the second answers `duplicate: true`). Returns the event id, the processing results, the commission events created and the payload sent. Audited.
+    #
+    # **Auth:** an API key with `billing:write`, or a session with role `owner`, `admin`.
+    #
+    # **Scopes:** `billing:write`, `full`, `admin`.
+    def post_sandbox_billing_fixtures(body, idempotency_key: nil)
+      request("POST", "/v1/sandbox/billing-fixtures", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Simulate billing history. POST /v1/sandbox/simulate
     #
     # Generates deterministic billing history through the real commission pipeline, so you can see commissions flow without a provider: a new sandbox customer referred to the partner, `months` (default 3) of subscription payments at `priceMinor`, then for `scenario: "refund"` a half refund of the first invoice or for `churn` a cancellation. Returns the customer and what was created. Audited.
@@ -5122,7 +5206,7 @@ module Referalli
 
     # Send a Stripe event fixture. POST /v1/sandbox/stripe-fixtures
     #
-    # Test mode only (`409 test_mode_only` otherwise). Builds a realistic Stripe event (`invoice.paid`, `charge.refunded`, `charge.dispute.created`, `customer.created`, `customer.updated`, `customer.subscription.created`, `customer.subscription.updated` or `customer.subscription.deleted`) and runs it through the same pipeline as a signed webhook to the stripe billing connection `connectionId`, so you can watch commissions happen without a Stripe account. `overrides` sets `customerRef` (the Stripe customer id), `amountMinor`, `currency`, `metadata`, `invoiceId` and `chargeId`; refunds and disputes find their payment by `chargeId`, so reuse the `invoice.paid` one. Each call is a new event unless you pass `eventId`, which replays (the second answers `duplicate: true`). Returns the event id, the processing results, the commission events created and the payload sent. Audited.
+    # Test mode only (`409 test_mode_only` otherwise). Builds a realistic Stripe event (`invoice.paid`, `charge.refunded`, `charge.dispute.created`, `customer.created`, `customer.updated`, `customer.subscription.created`, `customer.subscription.updated` or `customer.subscription.deleted`) and runs it through the same pipeline as a signed webhook to the stripe billing connection `connectionId`, so you can watch commissions happen without a Stripe account. `overrides` sets `customerRef` (the Stripe customer id), `amountMinor`, `currency`, `metadata`, `invoiceId`, `chargeId` and `subscriptionId`; refunds and disputes find their payment by `chargeId`, so reuse the `invoice.paid` one. Each call is a new event unless you pass `eventId`, which replays (the second answers `duplicate: true`). Returns the event id, the processing results, the commission events created and the payload sent. Audited. The Stripe-only alias of `POST /v1/sandbox/billing-fixtures`.
     #
     # **Auth:** an API key with `billing:write`, or a session with role `owner`, `admin`.
     #
@@ -5292,6 +5376,15 @@ module Referalli
       request("POST", "/v1/webhook-endpoints/#{seg(id)}/rotate-secret", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Exchange a user session for a widget token. POST /v1/widget/session
+    #
+    # Public, called by the referral widget from the browser with no merchant server route: `Authorization: Bearer <the signed-in user's own session JWT>` from their auth provider, body `{ programId }`. The program's auth connections say how to verify it (`tokenVerification`: a preset such as Clerk, Supabase, Firebase, Auth0, Cognito, WorkOS or Atlas, or your own issuer with a JWKS URL or HS256 secret); only connections whose issuer equals the token's `iss` are tried. Signature, issuer, audience (when configured) and expiry are checked with 60 seconds of clock skew. `customerRef` comes from `sub` (or the mapped claim). With the program's `settings.widget.autoEnroll`, a user who is not a partner yet is enrolled, but only with an email the token marks verified (`email_verified`); otherwise `404 not_enrolled`. CORS: only the connection's `allowedOrigins` (another origin gets `403` and no CORS header). Any token problem is a generic `401`. Rate-limited per connection, per user and (failures) per IP.
+    #
+    # **Auth:** none.
+    def post_widget_session(body, idempotency_key: nil)
+      request("POST", "/v1/widget/session", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Mint a referral widget token. POST /v1/widget/tokens
     #
     # Your backend mints a short-lived token (60 to 3600 seconds, default 900) for a signed-in customer, identified by `customerRef` or `partnerExternalRef`, for the in-app referral widget. When the program has `settings.widget.autoEnroll`, a customer who isn't a partner yet is created on demand (send `email`). The token only reads that partner's own data.
@@ -5338,7 +5431,7 @@ module Referalli
 
     # Set provider API credentials. PUT /v1/billing/connections/{id}/credentials
     #
-    # For providers that send thin webhooks (Recurly, BigCommerce), the API credentials used to fetch the full event: `apiKey`, or `apiToken` plus `storeHash`, and `region`. Stored encrypted. 400 for providers that take no credentials or when a required field is missing. Audited.
+    # For providers that send thin webhooks (Recurly, BigCommerce), the API credentials used to fetch the full event: `apiKey`, or `apiToken` plus `storeHash`, and `region`. Chargebee: `apiKey` and `site` (the subdomain), used by the account-credit rail (`PUT /v1/programs/{id}/credit-rail`); setting them needs a recent sign-in. Stored encrypted. 400 for providers that take no credentials or when a required field is missing. Audited.
     #
     # **Auth:** an API key with `billing:write`, or a session with role `owner`, `admin`.
     #
@@ -5711,6 +5804,17 @@ module Referalli
       request("PUT", "/v1/programs/#{seg(id)}/autopricing", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Set a program's account-credit rail settings. PUT /v1/programs/{id}/credit-rail
+    #
+    # Turns the account-credit rail on or off for a program and picks where credits go. `connectionId` names a billing connection: its provider picks the adapter (`stripe` or `chargebee`; verified live: Stripe only) and its stored API credentials are used (Chargebee: `PUT /v1/billing/connections/{id}/credentials` with `apiKey` and `site`). The connection's `programIds` must include the program or be empty. With no `connectionId` the provider is Stripe on its own key path (`PUT /v1/stripe-credits/connection`, a program key, or a Stripe payout connection). Every other field means what it means on `PUT /v1/programs/{id}/stripe-credits` and is replaced on every PUT. A provider without customer creation (Chargebee) refuses `createCustomerIfMissing` (400); Chargebee matches `referrerMatch: "metadata"` on `metadataKey` `id` (the customer id) or a custom field `cf_…`. Credentials are checked with the provider on save: `422 provider_credentials_invalid`, `422 provider_credentials_wrong_mode` (a Chargebee `…-test` site in live mode, or another site in test mode), `422 provider_permission` (cannot write credits), `502 provider_unavailable`; enabling without credentials is `409 credit_credentials_required` (`409 stripe_key_required` for Stripe). Owner or admin. Audited.
+    #
+    # **Auth:** an API key with `payouts:write`, or a session with role `owner`, `admin`.
+    #
+    # **Scopes:** `payouts:write`, `full`, `admin`.
+    def put_programs_id_credit_rail(id, body, idempotency_key: nil)
+      request("PUT", "/v1/programs/#{seg(id)}/credit-rail", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Set the incrementality holdout. PUT /v1/programs/{id}/incrementality
     #
     # Holds out a random control share of referrals (`holdoutBps`, up to 5000 = 50%) from being commissioned, so comparing control and treatment conversion measures the true lift partners cause. 0 turns it off.
@@ -5854,6 +5958,7 @@ module Referalli
       "getAuditLogs" => ["GET", "/v1/audit-logs", [], [["actor","actor"],["actorType","actor_type"],["action","action"],["subjectType","subject_type"],["subjectId","subject_id"],["created[gte]","created_gte"],["created[lte]","created_lte"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"]], false, :list, :get_audit_logs],
       "getAuthConnections" => ["GET", "/v1/auth/connections", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_auth_connections],
       "getAuthConnectionsIdExport" => ["GET", "/v1/auth/connections/{id}/export", ["id"], [["customerRef","customer_ref"]], false, :json, :get_auth_connections_id_export],
+      "getAuthConnectionsIdUsersCustomerRefReferral" => ["GET", "/v1/auth/connections/{id}/users/{customerRef}/referral", ["id","customerRef"], [], false, :json, :get_auth_connections_id_users_customer_ref_referral],
       "getAuthConnectionsProviders" => ["GET", "/v1/auth/connections/providers", [], [], false, :json, :get_auth_connections_providers],
       "getAuthProviders" => ["GET", "/v1/auth/providers", [], [], false, :json, :get_auth_providers],
       "getBillingConnections" => ["GET", "/v1/billing/connections", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_billing_connections],
@@ -5989,6 +6094,8 @@ module Referalli
       "getPrograms" => ["GET", "/v1/programs", [], [["slug","slug"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_programs],
       "getProgramsId" => ["GET", "/v1/programs/{id}", ["id"], [], false, :json, :get_programs_id],
       "getProgramsIdAutopricing" => ["GET", "/v1/programs/{id}/autopricing", ["id"], [], false, :json, :get_programs_id_autopricing],
+      "getProgramsIdCreditRail" => ["GET", "/v1/programs/{id}/credit-rail", ["id"], [], false, :json, :get_programs_id_credit_rail],
+      "getProgramsIdCreditRailLog" => ["GET", "/v1/programs/{id}/credit-rail/log", ["id"], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_programs_id_credit_rail_log],
       "getProgramsIdEnrollments" => ["GET", "/v1/programs/{id}/enrollments", ["id"], [["status","status"],["partnerId","partner_id"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_programs_id_enrollments],
       "getProgramsIdGraph" => ["GET", "/v1/programs/{id}/graph", ["id"], [["root","root"],["depth","depth"]], false, :json, :get_programs_id_graph],
       "getProgramsIdGroups" => ["GET", "/v1/programs/{id}/groups", ["id"], [["includeArchived","include_archived"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_programs_id_groups],
@@ -6018,6 +6125,7 @@ module Referalli
       "getRoiPatternsPattern" => ["GET", "/v1/roi/patterns/{pattern}", ["pattern"], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_roi_patterns_pattern],
       "getRoiSummary" => ["GET", "/v1/roi/summary", [], [["from","from"],["to","to"],["programId","program_id"],["partnerId","partner_id"],["windowDays","window_days"],["currency","currency"],["format","format"],["model","model"],["includeProjection","include_projection"]], false, :json, :get_roi_summary],
       "getRoiTraceCustomerRef" => ["GET", "/v1/roi/trace/{customerRef}", ["customerRef"], [["windowDays","window_days"],["format","format"]], false, :json, :get_roi_trace_customer_ref],
+      "getSandboxBillingFixtures" => ["GET", "/v1/sandbox/billing-fixtures", [], [["provider","provider"]], false, :json, :get_sandbox_billing_fixtures],
       "getSandboxStripeFixtures" => ["GET", "/v1/sandbox/stripe-fixtures", [], [], false, :json, :get_sandbox_stripe_fixtures],
       "getSetupStatus" => ["GET", "/v1/setup/status", [], [], false, :json, :get_setup_status],
       "getStatus" => ["GET", "/v1/status", [], [], false, :json, :get_status],
@@ -6083,6 +6191,7 @@ module Referalli
       "postAuthConnectionsIdSignals" => ["POST", "/v1/auth/connections/{id}/signals", ["id"], [], true, :json, :post_auth_connections_id_signals],
       "postAuthConnectionsIdSignups" => ["POST", "/v1/auth/connections/{id}/signups", ["id"], [], true, :json, :post_auth_connections_id_signups],
       "postAuthConnectionsIdUsers" => ["POST", "/v1/auth/connections/{id}/users", ["id"], [], true, :json, :post_auth_connections_id_users],
+      "postAuthConnectionsIdWidgetTokens" => ["POST", "/v1/auth/connections/{id}/widget-tokens", ["id"], [], true, :json, :post_auth_connections_id_widget_tokens],
       "postAuthConnectionsInstall" => ["POST", "/v1/auth/connections/install", [], [], true, :json, :post_auth_connections_install],
       "postAuthLogout" => ["POST", "/v1/auth/logout", [], [], false, :json, :post_auth_logout],
       "postBillingActivate" => ["POST", "/v1/billing/activate", [], [], true, :json, :post_billing_activate],
@@ -6192,6 +6301,7 @@ module Referalli
       "postPrograms" => ["POST", "/v1/programs", [], [], true, :json, :post_programs],
       "postProgramsIdApplyLeveling" => ["POST", "/v1/programs/{id}/apply-leveling", ["id"], [], false, :json, :post_programs_id_apply_leveling],
       "postProgramsIdAutopriceRun" => ["POST", "/v1/programs/{id}/autoprice/run", ["id"], [], true, :json, :post_programs_id_autoprice_run],
+      "postProgramsIdCreditRailRequeue" => ["POST", "/v1/programs/{id}/credit-rail/requeue", ["id"], [], true, :json, :post_programs_id_credit_rail_requeue],
       "postProgramsIdEnrollments" => ["POST", "/v1/programs/{id}/enrollments", ["id"], [], true, :json, :post_programs_id_enrollments],
       "postProgramsIdEnrollmentsEnrollmentIdApprove" => ["POST", "/v1/programs/{id}/enrollments/{enrollmentId}/approve", ["id","enrollmentId"], [], false, :json, :post_programs_id_enrollments_enrollment_id_approve],
       "postProgramsIdEnrollmentsEnrollmentIdReject" => ["POST", "/v1/programs/{id}/enrollments/{enrollmentId}/reject", ["id","enrollmentId"], [], false, :json, :post_programs_id_enrollments_enrollment_id_reject],
@@ -6210,6 +6320,7 @@ module Referalli
       "postRewardsIdRedeem" => ["POST", "/v1/rewards/{id}/redeem", ["id"], [], true, :json, :post_rewards_id_redeem],
       "postRewardsRedeemByCode" => ["POST", "/v1/rewards/redeem-by-code", [], [], true, :json, :post_rewards_redeem_by_code],
       "postRoiPatternsPatternReview" => ["POST", "/v1/roi/patterns/{pattern}/review", ["pattern"], [], true, :json, :post_roi_patterns_pattern_review],
+      "postSandboxBillingFixtures" => ["POST", "/v1/sandbox/billing-fixtures", [], [], true, :json, :post_sandbox_billing_fixtures],
       "postSandboxSimulate" => ["POST", "/v1/sandbox/simulate", [], [], true, :json, :post_sandbox_simulate],
       "postSandboxStripeFixtures" => ["POST", "/v1/sandbox/stripe-fixtures", [], [], true, :json, :post_sandbox_stripe_fixtures],
       "postSupportAppsAdapterTest" => ["POST", "/v1/support/apps/{adapter}/test", ["adapter"], [], true, :json, :post_support_apps_adapter_test],
@@ -6227,6 +6338,7 @@ module Referalli
       "postWebhookEndpoints" => ["POST", "/v1/webhook-endpoints", [], [], true, :json, :post_webhook_endpoints],
       "postWebhookEndpointsIdReplay" => ["POST", "/v1/webhook-endpoints/{id}/replay", ["id"], [["since","since"]], false, :json, :post_webhook_endpoints_id_replay],
       "postWebhookEndpointsIdRotateSecret" => ["POST", "/v1/webhook-endpoints/{id}/rotate-secret", ["id"], [], false, :json, :post_webhook_endpoints_id_rotate_secret],
+      "postWidgetSession" => ["POST", "/v1/widget/session", [], [], true, :json, :post_widget_session],
       "postWidgetTokens" => ["POST", "/v1/widget/tokens", [], [], true, :json, :post_widget_tokens],
       "postZapierConversions" => ["POST", "/v1/zapier/conversions", [], [], true, :json, :post_zapier_conversions],
       "postZapierHooks" => ["POST", "/v1/zapier/hooks", [], [], true, :json, :post_zapier_hooks],
@@ -6266,6 +6378,7 @@ module Referalli
       "putProfitabilityProductsProductRef" => ["PUT", "/v1/profitability/products/{productRef}", ["productRef"], [], true, :json, :put_profitability_products_product_ref],
       "putProfitabilitySettings" => ["PUT", "/v1/profitability/settings", [], [], true, :json, :put_profitability_settings],
       "putProgramsIdAutopricing" => ["PUT", "/v1/programs/{id}/autopricing", ["id"], [], true, :json, :put_programs_id_autopricing],
+      "putProgramsIdCreditRail" => ["PUT", "/v1/programs/{id}/credit-rail", ["id"], [], true, :json, :put_programs_id_credit_rail],
       "putProgramsIdIncrementality" => ["PUT", "/v1/programs/{id}/incrementality", ["id"], [], true, :json, :put_programs_id_incrementality],
       "putProgramsIdNegotiationPolicy" => ["PUT", "/v1/programs/{id}/negotiation-policy", ["id"], [], true, :json, :put_programs_id_negotiation_policy],
       "putProgramsIdPartnersPartnerIdGroup" => ["PUT", "/v1/programs/{id}/partners/{partnerId}/group", ["id","partnerId"], [], true, :json, :put_programs_id_partners_partner_id_group],

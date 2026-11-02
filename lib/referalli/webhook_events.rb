@@ -3,6 +3,21 @@
 
 module Referalli
   # One class per webhook topic (see WebhookEvent); Webhook.construct_event picks it by topic.
+  # `account_credit.applied`: An account credit was applied in your billing system
+  class AccountCreditAppliedEvent < WebhookEvent
+    TOPIC = "account_credit.applied"
+  end
+
+  # `account_credit.failed`: An account credit or debit gave up
+  class AccountCreditFailedEvent < WebhookEvent
+    TOPIC = "account_credit.failed"
+  end
+
+  # `account_credit.reversed`: An account credit was debited back after a reversal
+  class AccountCreditReversedEvent < WebhookEvent
+    TOPIC = "account_credit.reversed"
+  end
+
   # `api_key.expiring`: An API key expires soon
   class ApiKeyExpiringEvent < WebhookEvent
     TOPIC = "api_key.expiring"
@@ -200,6 +215,9 @@ module Referalli
 
   # Topic => event class.
   WEBHOOK_EVENT_CLASSES = {
+    "account_credit.applied" => AccountCreditAppliedEvent,
+    "account_credit.failed" => AccountCreditFailedEvent,
+    "account_credit.reversed" => AccountCreditReversedEvent,
     "api_key.expiring" => ApiKeyExpiringEvent,
     "billing_event.recorded" => BillingEventRecordedEvent,
     "click.recorded" => ClickRecordedEvent,
