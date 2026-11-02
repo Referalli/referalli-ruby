@@ -61,6 +61,12 @@ module Referalli
   # `access_suspended` (HTTP 403).
   class AccessSuspendedError < ApiError; end
 
+  # `program_scoped_key` (HTTP 403).
+  class ProgramScopedKeyError < ApiError; end
+
+  # `restricted_session` (HTTP 403).
+  class RestrictedSessionError < ApiError; end
+
   # `not_found` (HTTP 404).
   class NotFoundError < ApiError; end
 
@@ -69,6 +75,9 @@ module Referalli
 
   # `idempotency_in_progress` (HTTP 409).
   class IdempotencyInProgressError < ApiError; end
+
+  # `stripe_key_required` (HTTP 409).
+  class StripeKeyRequiredError < ApiError; end
 
   # `replay` (HTTP 409).
   class ReplayError < ApiError; end
@@ -121,9 +130,12 @@ module Referalli
     "webhooks_disabled" => WebhooksDisabledError,
     "sso_required" => SsoRequiredError,
     "access_suspended" => AccessSuspendedError,
+    "program_scoped_key" => ProgramScopedKeyError,
+    "restricted_session" => RestrictedSessionError,
     "not_found" => NotFoundError,
     "conflict" => ConflictError,
     "idempotency_in_progress" => IdempotencyInProgressError,
+    "stripe_key_required" => StripeKeyRequiredError,
     "replay" => ReplayError,
     "live_mode_only" => LiveModeOnlyError,
     "test_mode_only" => TestModeOnlyError,

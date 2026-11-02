@@ -158,6 +158,16 @@ module Referalli
     TOPIC = "roi.payback_reached"
   end
 
+  # `stripe_credit.applied`: A Stripe balance credit or debit was applied
+  class StripeCreditAppliedEvent < WebhookEvent
+    TOPIC = "stripe_credit.applied"
+  end
+
+  # `stripe_credit.failed`: A Stripe balance credit or debit gave up
+  class StripeCreditFailedEvent < WebhookEvent
+    TOPIC = "stripe_credit.failed"
+  end
+
   # `tax.form_delivered`: A tax form was delivered to a partner
   class TaxFormDeliveredEvent < WebhookEvent
     TOPIC = "tax.form_delivered"
@@ -211,6 +221,8 @@ module Referalli
     "referral.voided" => ReferralVoidedEvent,
     "roi.pattern_detected" => RoiPatternDetectedEvent,
     "roi.payback_reached" => RoiPaybackReachedEvent,
+    "stripe_credit.applied" => StripeCreditAppliedEvent,
+    "stripe_credit.failed" => StripeCreditFailedEvent,
     "tax.form_delivered" => TaxFormDeliveredEvent,
     "webhook_endpoint.disabled" => WebhookEndpointDisabledEvent,
     "webhook_endpoint.failing" => WebhookEndpointFailingEvent,
