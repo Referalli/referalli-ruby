@@ -79,6 +79,9 @@ module Referalli
   # `stripe_key_required` (HTTP 409).
   class StripeKeyRequiredError < ApiError; end
 
+  # `api_key_expired` (HTTP 409).
+  class ApiKeyExpiredError < ApiError; end
+
   # `replay` (HTTP 409).
   class ReplayError < ApiError; end
 
@@ -97,6 +100,15 @@ module Referalli
   # `idempotency_key_reused` (HTTP 422).
   class IdempotencyKeyReusedError < ApiError; end
 
+  # `stripe_key_invalid` (HTTP 422).
+  class StripeKeyInvalidError < ApiError; end
+
+  # `stripe_key_wrong_mode` (HTTP 422).
+  class StripeKeyWrongModeError < ApiError; end
+
+  # `stripe_key_permission` (HTTP 422).
+  class StripeKeyPermissionError < ApiError; end
+
   # `payload_too_large` (HTTP 413).
   class PayloadTooLargeError < ApiError; end
 
@@ -111,6 +123,9 @@ module Referalli
 
   # `atlas_error` (HTTP 502).
   class AtlasError < ApiError; end
+
+  # `stripe_unavailable` (HTTP 502).
+  class StripeUnavailableError < ApiError; end
 
   # `sso_provider_error` (HTTP 502).
   class SsoProviderError < ApiError; end
@@ -136,17 +151,22 @@ module Referalli
     "conflict" => ConflictError,
     "idempotency_in_progress" => IdempotencyInProgressError,
     "stripe_key_required" => StripeKeyRequiredError,
+    "api_key_expired" => ApiKeyExpiredError,
     "replay" => ReplayError,
     "live_mode_only" => LiveModeOnlyError,
     "test_mode_only" => TestModeOnlyError,
     "test_mode_unsupported" => TestModeUnsupportedError,
     "gone" => GoneError,
     "idempotency_key_reused" => IdempotencyKeyReusedError,
+    "stripe_key_invalid" => StripeKeyInvalidError,
+    "stripe_key_wrong_mode" => StripeKeyWrongModeError,
+    "stripe_key_permission" => StripeKeyPermissionError,
     "payload_too_large" => PayloadTooLargeError,
     "connection_paused" => ConnectionPausedError,
     "rate_limited" => RateLimitedError,
     "internal_error" => InternalServerError,
     "atlas_error" => AtlasError,
+    "stripe_unavailable" => StripeUnavailableError,
     "sso_provider_error" => SsoProviderError,
     "sso_not_configured" => SsoNotConfiguredError,
   }.freeze

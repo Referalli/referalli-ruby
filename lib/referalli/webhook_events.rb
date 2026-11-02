@@ -3,6 +3,11 @@
 
 module Referalli
   # One class per webhook topic (see WebhookEvent); Webhook.construct_event picks it by topic.
+  # `api_key.expiring`: An API key expires soon
+  class ApiKeyExpiringEvent < WebhookEvent
+    TOPIC = "api_key.expiring"
+  end
+
   # `billing_event.recorded`: A billing event was recorded
   class BillingEventRecordedEvent < WebhookEvent
     TOPIC = "billing_event.recorded"
@@ -51,6 +56,11 @@ module Referalli
   # `fraud.case_opened`: A fraud case was opened
   class FraudCaseOpenedEvent < WebhookEvent
     TOPIC = "fraud.case_opened"
+  end
+
+  # `fx.rates_updated`: The org's FX rates changed
+  class FxRatesUpdatedEvent < WebhookEvent
+    TOPIC = "fx.rates_updated"
   end
 
   # `partner.applied`: A partner applied to a program
@@ -190,6 +200,7 @@ module Referalli
 
   # Topic => event class.
   WEBHOOK_EVENT_CLASSES = {
+    "api_key.expiring" => ApiKeyExpiringEvent,
     "billing_event.recorded" => BillingEventRecordedEvent,
     "click.recorded" => ClickRecordedEvent,
     "commission.earned" => CommissionEarnedEvent,
@@ -200,6 +211,7 @@ module Referalli
     "deal.submitted" => DealSubmittedEvent,
     "dispute.resolved" => DisputeResolvedEvent,
     "fraud.case_opened" => FraudCaseOpenedEvent,
+    "fx.rates_updated" => FxRatesUpdatedEvent,
     "partner.applied" => PartnerAppliedEvent,
     "partner.approved" => PartnerApprovedEvent,
     "partner.enrolled" => PartnerEnrolledEvent,
