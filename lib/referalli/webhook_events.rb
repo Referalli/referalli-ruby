@@ -23,6 +23,21 @@ module Referalli
     TOPIC = "api_key.expiring"
   end
 
+  # `billing_account.owner_changed`: A billing account's owner changed
+  class BillingAccountOwnerChangedEvent < WebhookEvent
+    TOPIC = "billing_account.owner_changed"
+  end
+
+  # `billing_event.expired`: A parked refund or dispute expired
+  class BillingEventExpiredEvent < WebhookEvent
+    TOPIC = "billing_event.expired"
+  end
+
+  # `billing_event.held`: A payment was held for review
+  class BillingEventHeldEvent < WebhookEvent
+    TOPIC = "billing_event.held"
+  end
+
   # `billing_event.recorded`: A billing event was recorded
   class BillingEventRecordedEvent < WebhookEvent
     TOPIC = "billing_event.recorded"
@@ -219,6 +234,9 @@ module Referalli
     "account_credit.failed" => AccountCreditFailedEvent,
     "account_credit.reversed" => AccountCreditReversedEvent,
     "api_key.expiring" => ApiKeyExpiringEvent,
+    "billing_account.owner_changed" => BillingAccountOwnerChangedEvent,
+    "billing_event.expired" => BillingEventExpiredEvent,
+    "billing_event.held" => BillingEventHeldEvent,
     "billing_event.recorded" => BillingEventRecordedEvent,
     "click.recorded" => ClickRecordedEvent,
     "commission.earned" => CommissionEarnedEvent,

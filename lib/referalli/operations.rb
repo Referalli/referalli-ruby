@@ -6,11 +6,11 @@ module Referalli
   module Operations
     # Revoke an API key. DELETE /v1/api-keys/{id}
     #
-    # Revokes a key at once. `cascade=true` also revokes every key it minted (and theirs); `pair=true` also revokes its live/test twin. Returns the revoked ids. Needs an owner or admin session, or an API key with the `admin` scope. Audited.
+    # Revokes a key at once. `cascade=true` also revokes every key it minted (and theirs); `pair=true` also revokes its live/test twin. Returns the revoked ids. Needs an owner or admin session, or an API key with the `admin` scope. A key holding `api_keys:mint` may also do this for keys it minted itself (403 for any other). Audited.
     #
-    # **Auth:** an API key with `team:write`, or a session of any role.
+    # **Auth:** an API key with `api_keys:mint`, or a session of any role.
     #
-    # **Scopes:** `team:write`, `full`, `admin`.
+    # **Scopes:** `api_keys:mint`, `admin`.
     #
     # cascade: true: also revoke every key this key minted, and theirs.
     # pair: true: also revoke its live/test twin.
@@ -38,6 +38,17 @@ module Referalli
     # **Scopes:** `integrations:write`, `connections:write`, `full`, `admin`.
     def delete_auth_connections_id(id, idempotency_key: nil)
       request("DELETE", "/v1/auth/connections/#{seg(id)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Delete a billing account. DELETE /v1/billing/accounts/{accountRef}
+    #
+    # The organization was deleted: it has no owner from now on, and its provider customers stop resolving to the old owner, so later payments under it earn nothing. Commissions already earned stay, and refunds still reverse them. Setting an owner again restores it for later payments (payments made while it was deleted are not replayed). Returns the same shape as `PUT …/owner` with `deleted: true` and `ownerCustomerRef: null`; deleting an account with nothing recorded (or already deleted) answers `changed: false`. Publishes `billing_account.owner_changed`. Needs `billing:write`. Audited.
+    #
+    # **Auth:** an API key with `billing:write`, or a session with role `owner`, `admin`.
+    #
+    # **Scopes:** `billing:write`, `full`, `admin`.
+    def delete_billing_accounts_account_ref(account_ref, idempotency_key: nil)
+      request("DELETE", "/v1/billing/accounts/#{seg(account_ref)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Delete a billing connection. DELETE /v1/billing/connections/{id}
@@ -585,7 +596,7 @@ module Referalli
 
     # List auth connections. GET /v1/auth/connections
     #
-    # Auth-platform connections with provider, program, status, signature version and rotation state. Secrets are never returned.
+    # Auth-platform connections with provider, program, status, signature version, rotation state and `lastSignupAt` (when it last filed a new sign-up; null when never). Secrets are never returned.
     #
     # **Auth:** an API key with `integrations:read`, or a session of any role.
     #
@@ -603,6 +614,17 @@ module Referalli
     # Every item of #get_auth_connections, following the pages.
     def get_auth_connections_each(limit: nil, ending_before: nil, created_gte: nil, created_lte: nil, idempotency_key: nil, &block)
       paginate(->(cursor) { get_auth_connections(limit: limit, ending_before: ending_before, created_gte: created_gte, created_lte: created_lte, starting_after: cursor, idempotency_key: idempotency_key) }, &block)
+    end
+
+    # Get an auth connection. GET /v1/auth/connections/{id}
+    #
+    # One auth-platform connection, as in the list: provider, program, status, `allowedOrigins`, `tokenVerification` (without its secret), signature version and rotation state. Secrets are never returned. Unknown or deleted connections are 404.
+    #
+    # **Auth:** an API key with `integrations:read`, or a session of any role.
+    #
+    # **Scopes:** `integrations:read`, `integrations:write`, `connections:read`, `connections:write`, `read`, `full`, `admin`.
+    def get_auth_connections_id(id, idempotency_key: nil)
+      request("GET", "/v1/auth/connections/#{seg(id)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Export a user (signed protocol). GET /v1/auth/connections/{id}/export
@@ -643,6 +665,17 @@ module Referalli
       request("GET", "/v1/auth/providers", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Get a billing account's owner. GET /v1/billing/accounts/{accountRef}
+    #
+    # What is recorded for a billing account: `{ accountRef, ownerCustomerRef, since, renamedTo, deleted }`. A renamed id answers with `renamedTo` (and `ownerCustomerRef: null`); it follows that account. `404` when nothing is recorded.
+    #
+    # **Auth:** an API key with `billing:read`, or a session of any role.
+    #
+    # **Scopes:** `billing:read`, `billing:write`, `read`, `full`, `admin`.
+    def get_billing_accounts_account_ref(account_ref, idempotency_key: nil)
+      request("GET", "/v1/billing/accounts/#{seg(account_ref)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # List billing connections. GET /v1/billing/connections
     #
     # Billing connections (deleted ones excluded), with status (`active`, `paused`, or `awaiting_secret` until a provider-issued secret is set), `programIds`, whether credentials are needed and set, the value mapping and secret-rotation state. A program-scoped API key sees only connections whose `programIds` are all within its own.
@@ -678,7 +711,7 @@ module Referalli
 
     # List billing events. GET /v1/billing/events
     #
-    # Payments, refunds and other billing events received from every connection, newest first. Filter with `customerRef`, or `status=ignored_by_filter` for the events a product filter or the internal-customer list set aside (recorded, never processed). `ignoredReason: "no_referral_in_scope"` (with `status: "processed"`) marks a payment on a connection limited to some programs from a customer referred only in other programs: it earned nothing.
+    # Payments, refunds and other billing events received from every connection, newest first. Filter with `customerRef`, or `status=ignored_by_filter` for the events a product filter or the internal-customer list set aside (recorded, never processed), or `status=parked` for the refunds and disputes waiting for their payment: applied when it arrives, or dropped after 7 days with a `billing_event.expired` webhook event. `ignoredReason: "no_referral_in_scope"` (with `status: "processed"`) marks a payment on a connection limited to some programs from a customer referred only in other programs: it earned nothing.
     #
     # **Auth:** an API key with `billing:read`, or a session of any role.
     #
@@ -867,13 +900,13 @@ module Referalli
     # ending_before: A cursor: returns the items before this item id (the previous page). Not with `starting_after`. From API version 2026-11-01; ignored under 2026-10-21, where lists are a capped plain array.
     # created[gte]: Only items created at or after this time (ISO 8601), on lists of timestamped records. From API version 2026-11-01; ignored under 2026-10-21, where lists are a capped plain array.
     # created[lte]: Only items created at or before this time (ISO 8601), on lists of timestamped records. From API version 2026-11-01; ignored under 2026-10-21, where lists are a capped plain array.
-    def get_commissions(partner_id: nil, program_id: nil, type: nil, referral_id: nil, limit: nil, starting_after: nil, ending_before: nil, created_gte: nil, created_lte: nil, idempotency_key: nil)
-      request("GET", "/v1/commissions", query: { "partnerId" => partner_id, "programId" => program_id, "type" => type, "referralId" => referral_id, "limit" => limit, "starting_after" => starting_after, "ending_before" => ending_before, "created[gte]" => created_gte, "created[lte]" => created_lte }, body: nil, idempotency_key: idempotency_key, kind: :list)
+    def get_commissions(partner_id: nil, program_id: nil, type: nil, referral_id: nil, customer_ref: nil, limit: nil, starting_after: nil, ending_before: nil, created_gte: nil, created_lte: nil, idempotency_key: nil)
+      request("GET", "/v1/commissions", query: { "partnerId" => partner_id, "programId" => program_id, "type" => type, "referralId" => referral_id, "customerRef" => customer_ref, "limit" => limit, "starting_after" => starting_after, "ending_before" => ending_before, "created[gte]" => created_gte, "created[lte]" => created_lte }, body: nil, idempotency_key: idempotency_key, kind: :list)
     end
 
     # Every item of #get_commissions, following the pages.
-    def get_commissions_each(partner_id: nil, program_id: nil, type: nil, referral_id: nil, limit: nil, ending_before: nil, created_gte: nil, created_lte: nil, idempotency_key: nil, &block)
-      paginate(->(cursor) { get_commissions(partner_id: partner_id, program_id: program_id, type: type, referral_id: referral_id, limit: limit, ending_before: ending_before, created_gte: created_gte, created_lte: created_lte, starting_after: cursor, idempotency_key: idempotency_key) }, &block)
+    def get_commissions_each(partner_id: nil, program_id: nil, type: nil, referral_id: nil, customer_ref: nil, limit: nil, ending_before: nil, created_gte: nil, created_lte: nil, idempotency_key: nil, &block)
+      paginate(->(cursor) { get_commissions(partner_id: partner_id, program_id: program_id, type: type, referral_id: referral_id, customer_ref: customer_ref, limit: limit, ending_before: ending_before, created_gte: created_gte, created_lte: created_lte, starting_after: cursor, idempotency_key: idempotency_key) }, &block)
     end
 
     # Get a commission. GET /v1/commissions/{id}
@@ -1316,11 +1349,11 @@ module Referalli
 
     # Get the current caller. GET /v1/me
     #
-    # Who is calling. With a user session: the user and their org memberships (no `x-org-id` needed). With an API key: `{ user: null, memberships: [], apiKey, org: { id, name } }`, where `apiKey` holds the key (name, prefix, scopes, pinned `apiVersion`, `livemode`, owner, expiry, `programIds`). The mode is `apiKey.livemode`; there is no top-level `livemode`.
+    # Who is calling. With a user session: the user and their org memberships (no `x-org-id` needed). With an API key: `{ user: null, memberships: [], apiKey, org: { id, name } }`, where `apiKey` holds the key (name, prefix, scopes, pinned `apiVersion`, `livemode`, owner, expiry, `programIds`). The mode is `apiKey.livemode`; there is no top-level `livemode`. Any key may call it, whatever its scopes.
     #
-    # **Auth:** an API key with `team:read`, or a session of any role.
+    # **Auth:** an API key with `null`, or a session of any role.
     #
-    # **Scopes:** `team:read`, `team:write`, `read`, `full`, `admin`.
+    # **Scopes:** .
     def get_me(idempotency_key: nil)
       request("GET", "/v1/me", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
@@ -1597,6 +1630,17 @@ module Referalli
     # **Scopes:** `org:read`, `org:write`, `read`, `full`, `admin`.
     def get_org_tracking_consent(idempotency_key: nil)
       request("GET", "/v1/org/tracking-consent", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Both modes' tracking tokens. GET /v1/org/tracking-tokens
+    #
+    # The org's public tracking values for live and test mode, labelled: `{ mode, live, test }`, each with `orgId`, `trackingToken`, `scriptUrl` (aff.js), `linkBaseUrl` (the verified link domain, else Referalli's origin) and `linkTemplate` (`…/go/{token}/{code}`). `mode` is the caller's. Any key reads both, live or test; nothing else crosses modes. The test org is created on first use.
+    #
+    # **Auth:** an API key with `org:read`, or a session of any role.
+    #
+    # **Scopes:** `org:read`, `org:write`, `read`, `full`, `admin`.
+    def get_org_tracking_tokens(idempotency_key: nil)
+      request("GET", "/v1/org/tracking-tokens", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # List outreach messages. GET /v1/outreach
@@ -2519,6 +2563,17 @@ module Referalli
       paginate(->(cursor) { get_programs(slug: slug, limit: limit, ending_before: ending_before, created_gte: created_gte, created_lte: created_lte, starting_after: cursor, idempotency_key: idempotency_key) }, &block)
     end
 
+    # Check a public handle. GET /v1/programs/handle-availability
+    #
+    # Whether `handle` can be set as a program's `publicHandle`, using the same rules as `POST`/`PATCH /v1/programs`: `available: false` with `reason: "invalid"` when it is not 3 to 48 characters of `a-z`, `0-9` and `-`, or `reason: "taken"` when any program (in any org, including your own) already has it. Handles are claimed only by setting them, so a free handle can still be taken before you do; the setter's `409` names `details.field: "publicHandle"`.
+    #
+    # **Auth:** an API key with `programs:read`, or a session of any role.
+    #
+    # **Scopes:** `programs:read`, `programs:write`, `read`, `full`, `admin`.
+    def get_programs_handle_availability(handle:, idempotency_key: nil)
+      request("GET", "/v1/programs/handle-availability", query: { "handle" => handle }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Get a program. GET /v1/programs/{id}
     #
     # One program with its settings (defaults filled in) and public page.
@@ -2709,13 +2764,13 @@ module Referalli
 
     # Get a program's terms. GET /v1/programs/{id}/terms
     #
-    # The program's commission terms for product copy, from its latest commission rule version (`ruleVersion`): the `base` (`percentBps`, or `amountMinor` and `currency`), how long it recurs, the hold, and `summary.en`, an English sentence built deterministically from the rule, such as "20% of every payment for 12 months" or "$50.00 for the first payment only". Bounties are added (", plus $5.00 per signup"); rule conditions add "(conditions apply)"; overrides, tiers or new-vs-expansion rates set `ratesVary` and add "(rates vary)" rather than quote one rate. Partner-group rates and promotions are not included. Publishing a new rule version changes the terms on the next read. `404` when the program has no rule yet. Program-scoped keys read their own programs.
+    # The program's commission terms for product copy, from its latest commission rule version (`ruleVersion`): the `base` (`percentBps`, or `amountMinor` and `currency`), how long it recurs, the hold, and `summary`, the same sentence in each partner-portal locale (`en`, `es`, `de`, `fr`, `pt`, `it`, `nl`, `sv`, `ja`, `zh`), built deterministically from the rule, such as "20% of every payment for 12 months" or "$50.00 for the first payment only". Bounties are added (", plus $5.00 per signup"); rule conditions add "(conditions apply)"; overrides, tiers or new-vs-expansion rates set `ratesVary` and add "(rates vary)" rather than quote one rate. With `?locale=de` or an `Accept-Language` header the response also names the chosen `locale` and its sentence as `text` (an unsupported language gets `en`). Bounty event names are kept as written. Partner-group rates and promotions are not included. Publishing a new rule version changes the terms on the next read. `404` when the program has no rule yet. Program-scoped keys read their own programs.
     #
     # **Auth:** an API key with `programs:read`, or a session of any role.
     #
     # **Scopes:** `programs:read`, `programs:write`, `read`, `full`, `admin`.
-    def get_programs_id_terms(id, idempotency_key: nil)
-      request("GET", "/v1/programs/#{seg(id)}/terms", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    def get_programs_id_terms(id, locale: nil, idempotency_key: nil)
+      request("GET", "/v1/programs/#{seg(id)}/terms", query: { "locale" => locale }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # List terms acceptances. GET /v1/programs/{id}/terms-acceptances
@@ -2764,11 +2819,11 @@ module Referalli
 
     # Get a program's public page. GET /v1/public/programs/{handle}
     #
-    # What a program's public join page shows: the program and merchant names, pitch, cookie window, terms, base commission, branding and whether joining is approved at once. No authentication; only active live programs with a `publicHandle` are found.
+    # What a program's public join page shows: the program and merchant names, pitch, cookie window, terms, base commission, branding and whether joining is approved at once. `terms` is the program's commission terms as `GET /v1/programs/{id}/terms` gives them (the rule's base, how long it recurs, hold and `summary` in each portal locale), or null when it has no rule yet; with `?locale=` or `Accept-Language` it also names the chosen `locale` and its sentence as `text`. No authentication; only active live programs with a `publicHandle` are found.
     #
     # **Auth:** none.
-    def get_public_programs_handle(handle, idempotency_key: nil)
-      request("GET", "/v1/public/programs/#{seg(handle)}", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
+    def get_public_programs_handle(handle, locale: nil, idempotency_key: nil)
+      request("GET", "/v1/public/programs/#{seg(handle)}", query: { "locale" => locale }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # List referrals. GET /v1/referrals
@@ -3437,24 +3492,33 @@ module Referalli
 
     # Update an API key. PATCH /v1/api-keys/{id}
     #
-    # Changes a key's pinned `apiVersion`, `owner`, expiry (`expiresInDays` from now; `null` removes it) or `programIds` (`null` makes it org-wide); `apiVersion: "latest"` pins it to today's newest version. A new expiry re-arms the `api_key.expiring` notices. Revoked keys are 404. Needs an owner or admin session, or an API key with the `admin` scope. Audited.
+    # Renames a key or changes its pinned `apiVersion`, `owner`, expiry (`expiresInDays` from now, or `expiresAt`, an ISO 8601 time at most 3650 days out, not both; `null` removes it) or `programIds` (`null` makes it org-wide); `apiVersion: "latest"` pins it to today's newest version. A new expiry re-arms the `api_key.expiring` notices. `name` renames it; `scopes` replaces its scopes. Revoked keys are 404. Needs an owner or admin session, or an API key with the `admin` scope. A key holding `api_keys:mint` may also do this for keys it minted itself (403 for any other), but only to narrow `scopes` and `programIds`, never widen them or make the key org-wide. Audited.
     #
-    # **Auth:** an API key with `team:write`, or a session of any role.
+    # **Auth:** an API key with `api_keys:mint`, or a session of any role.
     #
-    # **Scopes:** `team:write`, `full`, `admin`.
+    # **Scopes:** `api_keys:mint`, `admin`.
     def patch_api_keys_id(id, body, idempotency_key: nil)
       request("PATCH", "/v1/api-keys/#{seg(id)}", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Update an auth connection. PATCH /v1/auth/connections/{id}
     #
-    # Pauses or resumes a connection, renames it, changes `autoEnrollUsers` or the destination of auto-created links, turns `resolveBillingCustomers` on or off, or (signed-protocol connections) sets `signatureVersion`: `v2` to require request-line signatures, `v1+v2` to accept both again. `resolveBillingCustomers` (any provider, default false): a billing customer that arrives with no customerRef (no `referalli_customer_ref` metadata, no `customerRefMetadataKey` hit) in a program this connection serves (within the billing connection's `programIds`) is resolved through this connection's users: `referalli_user_id` or `<provider>_user_id` metadata naming a user it reported, else exactly one user whose current email is the customer's and verified. The billing link is recorded as metadata would record it; none or several matches record `ignoredReason: "identity_unresolved"` / `"identity_ambiguous"` on the billing event. Explicit metadata always wins. Matching uses only the org's own data. `tokenVerification` replaces the widget-session verifier (an HS256 secret is kept when `sharedSecret` is left out; `null` removes it) and `allowedOrigins` replaces the origin list.
+    # Pauses or resumes a connection, renames it, changes `autoEnrollUsers` or the destination of auto-created links, turns `resolveBillingCustomers` on or off, or (signed-protocol connections) sets `signatureVersion`: `v2` to require request-line signatures, `v1+v2` to accept both again. `resolveBillingCustomers` (any provider, default false): a billing customer that arrives with no customerRef (no `referalli_customer_ref` metadata, no `customerRefMetadataKey` hit) in a program this connection serves (within the billing connection's `programIds`) is resolved through this connection's users: `referalli_user_id` or `<provider>_user_id` metadata naming a user it reported, else exactly one user whose current email is the customer's and verified. The billing link is recorded as metadata would record it; none or several matches record `ignoredReason: "identity_unresolved"` / `"identity_ambiguous"` on the billing event. Explicit metadata always wins. Matching uses only the org's own data. `tokenVerification` replaces the widget-session verifier (an HS256 secret is kept when `sharedSecret` is left out; `null` removes it) and `allowedOrigins` replaces the origin list. The auth platform itself can also call this path, signed with the connection secret and with only `allowedOrigins` in the body (no session), to set its origins; see `PUT /v1/auth/connections/{id}/origins`.
     #
     # **Auth:** an API key with `integrations:write`, or a session with role `owner`, `admin`.
     #
     # **Scopes:** `integrations:write`, `connections:write`, `full`, `admin`.
     def patch_auth_connections_id(id, body, idempotency_key: nil)
       request("PATCH", "/v1/auth/connections/#{seg(id)}", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Set a connection's allowed origins (signed protocol, PATCH). PATCH /v1/auth/connections/{id}/origins
+    #
+    # The same as `PUT /v1/auth/connections/{id}/origins`. Signed with the connection secret in `x-referalli-signature: t=<unix>,v1=…,v2=…` (v2 also signs the request line; once a connection has seen v2 it requires it), with a unique `x-referalli-id` per call. The legacy header names from before the rename are also accepted, for existing integrations. Calls older than 5 minutes, reused ids (`409 replay`), paused connections (`423 connection_paused`) and unknown fields (`422`) are refused.
+    #
+    # **Auth:** none.
+    def patch_auth_connections_id_origins(id, body, idempotency_key: nil)
+      request("PATCH", "/v1/auth/connections/#{seg(id)}/origins", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Update a billing connection. PATCH /v1/billing/connections/{id}
@@ -3547,7 +3611,7 @@ module Referalli
 
     # Update a program. PATCH /v1/programs/{id}
     #
-    # Changes any program field or setting; omitted fields keep their value, and `publicPage` is merged. Changing `termsMd` records a new terms version. Setting `status` to `paused` or `archived` stops new attribution. `mobileApp` (iOS Team ID and bundle id, Android package and signing-certificate fingerprints) publishes the program's apps in the universal-links and App Links files on the org's link hosts. `destinationUrl` moves the program's default link destination: every link still on the old default (the widget's or a sign-in connection's) is repointed in the same call, custom destinations stay, and links already shared follow at click time; `{code}` in it becomes the link's code. Audited.
+    # Changes any program field or setting; omitted fields keep their value, and `publicPage` is merged. Changing `termsMd` records a new terms version. Setting `status` to `paused` or `archived` stops new attribution. `signupPaymentGraceMinutes` (0 to 1440, default 5) is how long before the referral's sign-up time a payment still earns. `mobileApp` (iOS Team ID and bundle id, Android package and signing-certificate fingerprints) publishes the program's apps in the universal-links and App Links files on the org's link hosts. `destinationUrl` moves the program's default link destination: every link still on the old default (the widget's or a sign-in connection's) is repointed in the same call, custom destinations stay, and links already shared follow at click time; `{code}` in it becomes the link's code. A `publicHandle` another program has is `409 conflict` with `details: { field: 'publicHandle' }`. Audited.
     #
     # **Auth:** an API key with `programs:write`, or a session with role `owner`, `admin`.
     #
@@ -3672,22 +3736,22 @@ module Referalli
 
     # Create an API key. POST /v1/api-keys
     #
-    # Mints a secret key (`rk_live_…` / `rk_test_…`), shown only in this response (and in its `Idempotency-Key` replay: a retry with the same key and body within 24 hours returns this response again, secret included, without minting another). `scopes` defaults to `full`; a key can't grant scopes it doesn't hold. `mode` picks live, test or a matching pair of both (`both` returns `{ pairId, live, test }`); a test-mode caller can mint test keys only. `publishable: true` mints a browser-safe `rk_pub_` key limited to `programs:read` and `events:write` from `allowedOrigins`. `apiVersion` pins the key to a version, or `latest` (the default) to the newest version at the time of the call; the pin never moves on its own (a key keeps answering in that version after newer ones ship) until you `PATCH` it or send a `referalli-version` header. A key pinned to `2026-10-21` gets every list as a capped plain array instead of the paginated envelope. `programIds` limits the key to those programs (their partners, links, referrals, commissions, enrollments, webhook endpoints whose `programIds` are all within the key's, with their deliveries, and billing connections likewise); a program-scoped key gets 403 `program_scoped_key` on org-wide endpoints (keys, team, org settings, the rest of billing, payouts, the event feed, analytics, creating programs). An `api_keys:mint` key may also call this (and no other key endpoint): it can't mint `admin` or `api_keys:mint` keys or scopes it doesn't hold, and a program-scoped one must send `programIds` within its own (`403` otherwise). Needs an owner or admin session, or an API key with the `admin` scope. Audited.
+    # Expiry is `expiresInDays` or `expiresAt` (ISO 8601, at most 3650 days out), not both. Mints a secret key (`rk_live_…` / `rk_test_…`), shown only in this response (and in its `Idempotency-Key` replay: a retry with the same key and body within 24 hours returns this response again, secret included, without minting another). `scopes` defaults to `full`; a key can't grant scopes it doesn't hold. `mode` picks live, test or a matching pair of both (`both` returns `{ pairId, live, test }`); a test-mode caller can mint test keys only. `publishable: true` mints a browser-safe `rk_pub_` key limited to `programs:read` and `events:write` from `allowedOrigins`. `apiVersion` pins the key to a version, or `latest` (the default) to the newest version at the time of the call; the pin never moves on its own (a key keeps answering in that version after newer ones ship) until you `PATCH` it or send a `referalli-version` header. A key pinned to `2026-10-21` gets every list as a capped plain array instead of the paginated envelope. `programIds` limits the key to those programs (their partners, links, referrals, commissions, enrollments, webhook endpoints whose `programIds` are all within the key's, with their deliveries, billing connections likewise, auth connections of those programs, and privacy lookup, export, forget and requests for people in those programs); a program-scoped key gets 403 `program_scoped_key` on org-wide endpoints (keys, team, org settings, the rest of billing, payouts, the event feed, analytics, creating programs). An `api_keys:mint` key may also call this (and no other key endpoint): it can't mint `admin` or `api_keys:mint` keys or scopes it doesn't hold, and a program-scoped one must send `programIds` within its own (`403` otherwise). Needs an owner or admin session, or an API key with the `admin` scope. Audited.
     #
-    # **Auth:** an API key with `team:write`, or a session of any role.
+    # **Auth:** an API key with `api_keys:mint`, or a session of any role.
     #
-    # **Scopes:** `team:write`, `api_keys:mint`, `full`, `admin`.
+    # **Scopes:** `api_keys:mint`, `admin`.
     def post_api_keys(body, idempotency_key: nil)
       request("POST", "/v1/api-keys", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Rotate an API key. POST /v1/api-keys/{id}/rotate
     #
-    # Mints a replacement key with the same name, scopes, origins, version pin, owner, programs and lifetime (an expiring key's new expiry is the same length from now), returned once with `rotatedFrom: { id, expiresAt }`. The old key keeps working for `graceHours` (default 24, at most 168, 0 = stop now), then expires; it gets no `api_key.expiring` notice. An expired or revoked key can't be rotated (409 `api_key_expired` / 404). Needs an owner or admin session, or an API key with the `admin` scope. Audited.
+    # Mints a replacement key with the same name, scopes, origins, version pin, owner, programs and lifetime (an expiring key's new expiry is the same length from now), returned once with `rotatedFrom: { id, expiresAt }`. The old key keeps working for `graceHours` (default 24, at most 168, 0 = stop now), then expires; it gets no `api_key.expiring` notice. An expired or revoked key can't be rotated (409 `api_key_expired` / 404). Needs an owner or admin session, or an API key with the `admin` scope. A key holding `api_keys:mint` may also do this for keys it minted itself (403 for any other). Audited.
     #
-    # **Auth:** an API key with `team:write`, or a session of any role.
+    # **Auth:** an API key with `api_keys:mint`, or a session of any role.
     #
-    # **Scopes:** `team:write`, `full`, `admin`.
+    # **Scopes:** `api_keys:mint`, `admin`.
     def post_api_keys_id_rotate(id, body, idempotency_key: nil)
       request("POST", "/v1/api-keys/#{seg(id)}/rotate", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
@@ -3734,6 +3798,15 @@ module Referalli
       request("POST", "/v1/auth/connections", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Set an organization's owner (signed protocol). POST /v1/auth/connections/{id}/accounts
+    #
+    # The `accounts` capability: an organization the app bills under (`accountRef`: its id in billing metadata, e.g. Atlas's `external_id`) is owned by `ownerCustomerRef` (a user the connection reports). Its payments earn for the owner's referral; send it again whenever ownership changes. When the organization's id changes, send the new id as `accountRef` with the old one as `previousAccountRef` (the owner carries over unless `ownerCustomerRef` is sent): the old id then follows the new one. When it is deleted, send `{ accountRef, deleted: true }`: it has no owner from then on, so its payments earn nothing (earned commissions stay; refunds still reverse them). Same as `PUT /v1/billing/accounts/{accountRef}/owner` and `DELETE /v1/billing/accounts/{accountRef}`; returns `{ ok, accountRef, ownerCustomerRef, previousOwnerCustomerRef, renamedFrom, deleted, changed, relinked, reprocessedPayments }`; a repeat answers `changed: false`. Publishes `billing_account.owner_changed`. Signed with the connection secret in `x-referalli-signature: t=<unix>,v1=…,v2=…` (v2 also signs the request line; once a connection has seen v2 it requires it), with a unique `x-referalli-id` per call. The legacy header names from before the rename are also accepted, for existing integrations. Calls older than 5 minutes, reused ids (`409 replay`), paused connections (`423 connection_paused`) and unknown fields (`422`) are refused.
+    #
+    # **Auth:** none.
+    def post_auth_connections_id_accounts(id, body, idempotency_key: nil)
+      request("POST", "/v1/auth/connections/#{seg(id)}/accounts", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Change a user's id (signed protocol). POST /v1/auth/connections/{id}/aliases
     #
     # The app stamped or changed a user's id after the sign-up was filed: referrals and identity move from `fromCustomerRef` to `toCustomerRef`. Publishes `customer.aliased`. Signed with the connection secret in `x-referalli-signature: t=<unix>,v1=…,v2=…` (v2 also signs the request line; once a connection has seen v2 it requires it), with a unique `x-referalli-id` per call. The legacy header names from before the rename are also accepted, for existing integrations. Calls older than 5 minutes, reused ids (`409 replay`), paused connections (`423 connection_paused`) and unknown fields (`422`) are refused.
@@ -3763,7 +3836,7 @@ module Referalli
 
     # Test an auth connection (signed protocol). POST /v1/auth/connections/{id}/ping
     #
-    # Proves the secret works: returns the connection, its program and org, the server time (to check clock skew) and `capabilities` (`{ partners: true }`: user-chosen referral codes through `/partners`). Signed with the connection secret in `x-referalli-signature: t=<unix>,v1=…,v2=…` (v2 also signs the request line; once a connection has seen v2 it requires it), with a unique `x-referalli-id` per call. The legacy header names from before the rename are also accepted, for existing integrations. Calls older than 5 minutes, reused ids (`409 replay`), paused connections (`423 connection_paused`) and unknown fields (`422`) are refused.
+    # Proves the secret works: returns the connection, its program and org, the server time (to check clock skew) and `capabilities` (`{ partners: true, origins: true, accounts: true }`: user-chosen referral codes through `/partners`, setting `allowedOrigins` through `PUT …/origins` or a signed PATCH, and organization owners through `/accounts`). Signed with the connection secret in `x-referalli-signature: t=<unix>,v1=…,v2=…` (v2 also signs the request line; once a connection has seen v2 it requires it), with a unique `x-referalli-id` per call. The legacy header names from before the rename are also accepted, for existing integrations. Calls older than 5 minutes, reused ids (`409 replay`), paused connections (`423 connection_paused`) and unknown fields (`422`) are refused.
     #
     # **Auth:** a signature (see above); no API key.
     def post_auth_connections_id_ping(id, body, idempotency_key: nil)
@@ -3881,6 +3954,17 @@ module Referalli
       request("POST", "/v1/billing/connections", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Send events to a generic connection. POST /v1/billing/connections/{id}/events
+    #
+    # The generic connection's webhook body (`{ "events": [...] }`, up to 500) sent with an API key instead of the connection's HMAC signature, so your server needs no second secret. Runs the same processing as `POST /webhooks/billing/{id}`: paid invoices become conversions and commissions, refunds and disputes reverse them, and each event is idempotent by `providerEventId` (a resend answers `duplicate: true`), whichever of the two routes sent it first. Needs `billing:write`; a program-scoped key reaches only connections limited to its own programs. `404` for an unknown, deleted or paused connection; `409 conflict` for a connection that isn't `generic` (those take their provider's webhooks).
+    #
+    # **Auth:** an API key with `billing:write`, or a session with role `owner`, `admin`.
+    #
+    # **Scopes:** `billing:write`, `full`, `admin`.
+    def post_billing_connections_id_events(id, body, idempotency_key: nil)
+      request("POST", "/v1/billing/connections/#{seg(id)}/events", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Rotate the webhook signing secret. POST /v1/billing/connections/{id}/rotate-secret
     #
     # Generates a new signing secret, returned once. The previous one keeps verifying until `previousSecretExpiresAt` (24 hours). Audited.
@@ -3901,6 +3985,17 @@ module Referalli
     # **Scopes:** `billing:write`, `full`, `admin`.
     def post_billing_connections_id_value_mapping_preview(id, body, idempotency_key: nil)
       request("POST", "/v1/billing/connections/#{seg(id)}/value-mapping/preview", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Release a held payment. POST /v1/billing/events/{id}/release
+    #
+    # A payment over its connection's `maxAmountMinor` (default 1,000,000,000 minor units), or dated more than a day ahead, is recorded with `status: "held"` and earns nothing. Releasing it says it is real: it earns as it would have on arrival, and any refund that waited for it applies.
+    #
+    # **Auth:** an API key with `billing:write`, or a session with role `owner`, `admin`.
+    #
+    # **Scopes:** `billing:write`, `full`, `admin`.
+    def post_billing_events_id_release(id, idempotency_key: nil)
+      request("POST", "/v1/billing/events/#{seg(id)}/release", query: {  }, body: nil, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Add an internal customer. POST /v1/billing/internal-customers
@@ -4471,7 +4566,7 @@ module Referalli
 
     # Mint an executor key under a Cookie Munch partner link. POST /v1/orgs/{orgId}/privacy/executor-key
     #
-    # Called by Cookie Munch, not by you (CMU-X25): mints (or rotates) this org's cm-standard-v2 executor key so Cookie Munch's `referalli` executor preset can connect without a pasted key. The request must be signed by Cookie Munch's partner key exactly like its consent deliveries: `CookieMunch-Partner-Signature: t=<unix seconds>,kid=<key id>,ed25519=<base64url>` over `<t>.<raw body>`, with the key named in `https://api.cookiemunch.net/v1/partner/jwks.json` (300 s window; each signed request and each body `nonce` works once, a replay is 409; `partner` must be `referalli` and `externalId` the org in the path). Referalli then confirms the partner link with Cookie Munch over its own partner token (`GET /v1/partner/links`): it must be `active` or `waiting_on_partner`, name this org as `externalId`, sit on a site this org registered (`PUT /v1/org/consent-partners/cookiemunch`), and match `cbid`/`linkId` when sent; otherwise 403 `no_grant`. 201 `{secret, executorUrl, contract, orgId, linkId, cbid, rotated}`: `secret` is shown once and is the bearer key for `executorUrl` (`https://referalli.com/api`, the cm-standard-v2 baseUrl: calls go to `<executorUrl>/privacy/*`), where it reaches only this org's referred customers and partners. The old key stops working at once. Audited (`privacy.executor_key_minted`).
+    # Called by Cookie Munch, not by you (CMU-X25): mints (or rotates) this org's cm-standard-v2 executor key, limited to `programIds` when sent so Cookie Munch's `referalli` executor preset can connect without a pasted key. The request must be signed by Cookie Munch's partner key exactly like its consent deliveries: `CookieMunch-Partner-Signature: t=<unix seconds>,kid=<key id>,ed25519=<base64url>` over `<t>.<raw body>`, with the key named in `https://api.cookiemunch.net/v1/partner/jwks.json` (300 s window; each signed request and each body `nonce` works once, a replay is 409; `partner` must be `referalli` and `externalId` the org in the path). Referalli then confirms the partner link with Cookie Munch over its own partner token (`GET /v1/partner/links`): it must be `active` or `waiting_on_partner`, name this org as `externalId`, sit on a site this org registered (`PUT /v1/org/consent-partners/cookiemunch`), and match `cbid`/`linkId` when sent; otherwise 403 `no_grant`. 201 `{secret, executorUrl, contract, orgId, linkId, cbid, rotated}`: `secret` is shown once and is the bearer key for `executorUrl` (`https://referalli.com/api`, the cm-standard-v2 baseUrl: calls go to `<executorUrl>/privacy/*`), where it reaches only this org's referred customers and partners. The old key stops working at once. Audited (`privacy.executor_key_minted`).
     #
     # **Auth:** none.
     def post_orgs_org_id_privacy_executor_key(org_id, body, idempotency_key: nil)
@@ -4944,7 +5039,7 @@ module Referalli
 
     # Create a program. POST /v1/programs
     #
-    # Creates an affiliate program: its attribution model, cookie window, how long after sign-up a conversion still counts (`signupToConversionDays`, 1 to 1095, default 365; `cookieWindowDays` is 1 to 400, default 60), terms, public page and settings. `slug` is unique per org. Terms are versioned so partners can be asked to accept new ones. Over the plan's program limit this is `402 payment_required`.
+    # Creates an affiliate program: its attribution model, cookie window, how long after sign-up a conversion still counts (`signupToConversionDays`, 1 to 1095, default 365; `cookieWindowDays` is 1 to 400, default 60), terms, public page and settings (`signupPaymentGraceMinutes`, 0 to 1440, default 5: how long before the referral's sign-up time a payment still earns). `slug` is unique per org. Terms are versioned so partners can be asked to accept new ones. `publicHandle` is unique across every org (check it first with `GET /v1/programs/handle-availability`). A taken `slug` or `publicHandle` is `409 conflict` with `details.field` naming it (`slug` or `publicHandle`). Over the plan's program limit this is `402 payment_required`.
     #
     # **Auth:** an API key with `programs:write`, or a session with role `owner`, `admin`.
     #
@@ -5096,13 +5191,24 @@ module Referalli
 
     # Attribute a new customer. POST /v1/referrals/associate
     #
-    # The key server-side call: tell Referalli a customer signed up, with whatever you know about where they came from (`referralToken`/`ref_click_id`, `anonId`, `couponCode`, `emailHash`, IP and user agent). The attribution engine picks the partner under the program's model and windows. `referral` is `null` when no partner matched (not an error); `reasoning.notes` says why. Repeating `idempotencyKey` returns the existing referral. `occurredAt` records a late call at the real sign-up time (up to 5 minutes of clock skew is tolerated) and backfills payments since. `emailDomain` lets burner-email sign-ups be held for review. Publishes `referral.created` (or `referral.held`).
+    # The key server-side call: tell Referalli a customer signed up, with whatever you know about where they came from (`referralToken`/`ref_click_id`, `anonId`, `couponCode`, `emailHash`, IP and user agent). The attribution engine picks the partner under the program's model and windows. `referral` is `null` when no partner matched (not an error); `reasoning.notes` says why. Repeating `idempotencyKey` returns the existing referral. `occurredAt` records a late call at the real sign-up time (up to 5 minutes of clock skew is tolerated) and backfills payments since. `emailDomain` lets burner-email sign-ups be held for review. `handoffToken` (from `POST /t/{orgToken}/handoff` or `POST /v1/referrals/handoff-tokens`) fills `anonId`, `referralToken` and `couponCode` where they are not sent; a malformed, expired or other org's token is `400 invalid_handoff_token`. Publishes `referral.created` (or `referral.held`).
     #
     # **Auth:** an API key with `referrals:write`, or a session of any role.
     #
     # **Scopes:** `referrals:write`, `full`, `admin`.
     def post_referrals_associate(body, idempotency_key: nil)
       request("POST", "/v1/referrals/associate", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Mint a hand-off token. POST /v1/referrals/handoff-tokens
+    #
+    # The server-side twin of `POST /t/{orgToken}/handoff`: signs `anonId`, `clickId` and/or `code` (at least one) into a token valid for 24 hours, for this org only, to pass later to `POST /v1/referrals/associate` as `handoffToken`. Use it when the server that saw the landing (`?ref_click_id=`) is not the one that files the sign-up.
+    #
+    # **Auth:** an API key with `referrals:write`, or a session of any role.
+    #
+    # **Scopes:** `referrals:write`, `full`, `admin`.
+    def post_referrals_handoff_tokens(body, idempotency_key: nil)
+      request("POST", "/v1/referrals/handoff-tokens", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Approve a held referral. POST /v1/referrals/{id}/approve
@@ -5195,7 +5301,7 @@ module Referalli
 
     # Simulate billing history. POST /v1/sandbox/simulate
     #
-    # Generates deterministic billing history through the real commission pipeline, so you can see commissions flow without a provider: a new sandbox customer referred to the partner, `months` (default 3) of subscription payments at `priceMinor`, then for `scenario: "refund"` a half refund of the first invoice or for `churn` a cancellation. Returns the customer and what was created. Audited.
+    # Generates deterministic billing history through the real commission pipeline, so you can see commissions flow without a provider: a new sandbox customer referred to the partner, `months` (default 3) of subscription payments at `priceMinor`, then for `scenario: "refund"` a half refund of the first invoice or for `churn` a cancellation. Returns the customer and what was created. `scenario: "signup_and_pay"` (test mode only, `409 test_mode_only` otherwise) proves the whole loop instead: a sign-up of `customerRef` (default a new `cus_sandbox_…`) referred by `partnerId` (a click on their link) or by `code` (a link or coupon code), filed through auth connection `authConnectionId` exactly as its signed `POST /v1/auth/connections/{id}/signups` would file it (auto-enroll included) or, without one, as `POST /v1/referrals/associate`; then a provider-neutral `payment.paid` of `amountMinor` (default 4900) in `currency` (default USD) through billing connection `billingConnectionId` (default the org's only active one, else `409`), run through the same pipeline as `POST /v1/sandbox/billing-fixtures`. Answers `{ scenario, ok, steps: [signup, payment], commissions }`; a step that could not succeed answers `ok: false` with `notes` saying why (sign-up not credited, auth connection paused or in another program, billing connection `awaiting_secret`, paused or limited to other programs, payment ignored, program without a commission rule) rather than an error. Audited.
     #
     # **Auth:** an API key with `billing:write`, or a session with role `owner`, `admin`.
     #
@@ -5418,6 +5524,15 @@ module Referalli
       request("POST", "/v1/zapier/hooks", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
+    # Set a connection's allowed origins (signed protocol). PUT /v1/auth/connections/{id}/origins
+    #
+    # The `origins` capability: the auth platform replaces this connection's own `allowedOrigins` (the browser origins that may call `POST /v1/widget/session`) when its app's origins change. Exact origins only (`https://app.example.com`, no path or wildcard; `http` only for localhost), at most 50; the body takes nothing else. Returns `{ id, allowedOrigins }`. Audited. A connection-signed `PATCH /v1/auth/connections/{id}` with the same body does the same. Signed with the connection secret in `x-referalli-signature: t=<unix>,v1=…,v2=…` (v2 also signs the request line; once a connection has seen v2 it requires it), with a unique `x-referalli-id` per call. The legacy header names from before the rename are also accepted, for existing integrations. Calls older than 5 minutes, reused ids (`409 replay`), paused connections (`423 connection_paused`) and unknown fields (`422`) are refused.
+    #
+    # **Auth:** none.
+    def put_auth_connections_id_origins(id, body, idempotency_key: nil)
+      request("PUT", "/v1/auth/connections/#{seg(id)}/origins", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
     # Set a vendor-issued secret. PUT /v1/auth/connections/{id}/secret
     #
     # For webhook connectors whose vendor issues the signing secret (Clerk, Stytch, WorkOS) or key set (Kinde's JWKS document): replaces the connection's secret. The previous one keeps verifying for 24 hours. Signed-protocol connections rotate instead. Audited.
@@ -5427,6 +5542,17 @@ module Referalli
     # **Scopes:** `integrations:write`, `connections:write`, `full`, `admin`.
     def put_auth_connections_id_secret(id, body, idempotency_key: nil)
       request("PUT", "/v1/auth/connections/#{seg(id)}/secret", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
+    end
+
+    # Set a billing account's owner. PUT /v1/billing/accounts/{accountRef}/owner
+    #
+    # For products that bill an organization (a team, a workspace) rather than a person. `accountRef` is the id your billing events carry for the organization (the `customerRef` of a generic event, or the metadata value a connection's `customerRefMetadataKey` reads, e.g. `organization_id`); `ownerCustomerRef` is the user whose referral its payments earn for. From then on the account's payments earn for the owner's referral (unless a referral is filed under the account itself). The first owner set replays the account's earlier payments for that owner's referral. Changing the owner re-points the account's provider customers, so later payments earn for the new owner's referral; payments made before the change stay with the previous owner's referral. When the organization's id changed, call it under the new id with `previousAccountRef` (the old one) instead of, or as well as, `ownerCustomerRef`: the old id then follows the new one (payments still arriving under it earn for the new id's owner), and the owner carries over unless named. Returns `{ accountRef, ownerCustomerRef, previousOwnerCustomerRef, renamedFrom, deleted, changed, relinked, reprocessedPayments }`; the same call again answers `changed: false`. Publishes `billing_account.owner_changed`. Auth platforms with the `accounts` capability (Atlas) send this for you through `POST /v1/auth/connections/{id}/accounts`. Needs `billing:write`. Audited.
+    #
+    # **Auth:** an API key with `billing:write`, or a session with role `owner`, `admin`.
+    #
+    # **Scopes:** `billing:write`, `full`, `admin`.
+    def put_billing_accounts_account_ref_owner(account_ref, body, idempotency_key: nil)
+      request("PUT", "/v1/billing/accounts/#{seg(account_ref)}/owner", query: {  }, body: body, idempotency_key: idempotency_key, kind: :json)
     end
 
     # Set provider API credentials. PUT /v1/billing/connections/{id}/credentials
@@ -5919,6 +6045,7 @@ module Referalli
       "deleteApiKeysId" => ["DELETE", "/v1/api-keys/{id}", ["id"], [["cascade","cascade"],["pair","pair"]], false, :json, :delete_api_keys_id],
       "deleteAssetsId" => ["DELETE", "/v1/assets/{id}", ["id"], [], false, :json, :delete_assets_id],
       "deleteAuthConnectionsId" => ["DELETE", "/v1/auth/connections/{id}", ["id"], [], false, :json, :delete_auth_connections_id],
+      "deleteBillingAccountsAccountRef" => ["DELETE", "/v1/billing/accounts/{accountRef}", ["accountRef"], [], false, :json, :delete_billing_accounts_account_ref],
       "deleteBillingConnectionsId" => ["DELETE", "/v1/billing/connections/{id}", ["id"], [], false, :json, :delete_billing_connections_id],
       "deleteBillingInternalCustomersCustomerRef" => ["DELETE", "/v1/billing/internal-customers/{customerRef}", ["customerRef"], [], false, :json, :delete_billing_internal_customers_customer_ref],
       "deleteBrandingDomain" => ["DELETE", "/v1/branding/domain", [], [], false, :json, :delete_branding_domain],
@@ -5957,10 +6084,12 @@ module Referalli
       "getAssistantSuggestions" => ["GET", "/v1/assistant/suggestions", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_assistant_suggestions],
       "getAuditLogs" => ["GET", "/v1/audit-logs", [], [["actor","actor"],["actorType","actor_type"],["action","action"],["subjectType","subject_type"],["subjectId","subject_id"],["created[gte]","created_gte"],["created[lte]","created_lte"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"]], false, :list, :get_audit_logs],
       "getAuthConnections" => ["GET", "/v1/auth/connections", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_auth_connections],
+      "getAuthConnectionsId" => ["GET", "/v1/auth/connections/{id}", ["id"], [], false, :json, :get_auth_connections_id],
       "getAuthConnectionsIdExport" => ["GET", "/v1/auth/connections/{id}/export", ["id"], [["customerRef","customer_ref"]], false, :json, :get_auth_connections_id_export],
       "getAuthConnectionsIdUsersCustomerRefReferral" => ["GET", "/v1/auth/connections/{id}/users/{customerRef}/referral", ["id","customerRef"], [], false, :json, :get_auth_connections_id_users_customer_ref_referral],
       "getAuthConnectionsProviders" => ["GET", "/v1/auth/connections/providers", [], [], false, :json, :get_auth_connections_providers],
       "getAuthProviders" => ["GET", "/v1/auth/providers", [], [], false, :json, :get_auth_providers],
+      "getBillingAccountsAccountRef" => ["GET", "/v1/billing/accounts/{accountRef}", ["accountRef"], [], false, :json, :get_billing_accounts_account_ref],
       "getBillingConnections" => ["GET", "/v1/billing/connections", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_billing_connections],
       "getBillingConnectionsId" => ["GET", "/v1/billing/connections/{id}", ["id"], [], false, :json, :get_billing_connections_id],
       "getBillingEvents" => ["GET", "/v1/billing/events", [], [["customerRef","customer_ref"],["status","status"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_billing_events],
@@ -5977,7 +6106,7 @@ module Referalli
       "getCliLogs" => ["GET", "/v1/cli/logs", [], [["after","after"],["wait","wait"],["limit","limit"]], false, :json, :get_cli_logs],
       "getCliTopics" => ["GET", "/v1/cli/topics", [], [], false, :json, :get_cli_topics],
       "getCommissionRules" => ["GET", "/v1/commission-rules", [], [["programId","program_id"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_commission_rules],
-      "getCommissions" => ["GET", "/v1/commissions", [], [["partnerId","partner_id"],["programId","program_id"],["type","type"],["referralId","referral_id"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_commissions],
+      "getCommissions" => ["GET", "/v1/commissions", [], [["partnerId","partner_id"],["programId","program_id"],["type","type"],["referralId","referral_id"],["customerRef","customer_ref"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_commissions],
       "getCommissionsId" => ["GET", "/v1/commissions/{id}", ["id"], [], false, :json, :get_commissions_id],
       "getContracts" => ["GET", "/v1/contracts", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_contracts],
       "getCoupons" => ["GET", "/v1/coupons", [], [["programId","program_id"],["partnerId","partner_id"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_coupons],
@@ -6028,6 +6157,7 @@ module Referalli
       "getOrgSsoConnectionsIdSamlMetadata" => ["GET", "/v1/org/sso/connections/{id}/saml-metadata", ["id"], [], false, :json, :get_org_sso_connections_id_saml_metadata],
       "getOrgTaxProfile" => ["GET", "/v1/org/tax-profile", [], [], false, :json, :get_org_tax_profile],
       "getOrgTrackingConsent" => ["GET", "/v1/org/tracking-consent", [], [], false, :json, :get_org_tracking_consent],
+      "getOrgTrackingTokens" => ["GET", "/v1/org/tracking-tokens", [], [], false, :json, :get_org_tracking_tokens],
       "getOutreach" => ["GET", "/v1/outreach", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_outreach],
       "getPartnerAchievements" => ["GET", "/v1/partner/achievements", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_partner_achievements],
       "getPartnerAdvance" => ["GET", "/v1/partner/advance", [], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_partner_advance],
@@ -6092,6 +6222,7 @@ module Referalli
       "getProfitabilityRebuildJobId" => ["GET", "/v1/profitability/rebuild/{jobId}", ["jobId"], [], false, :json, :get_profitability_rebuild_job_id],
       "getProfitabilitySettings" => ["GET", "/v1/profitability/settings", [], [["programId","program_id"]], false, :json, :get_profitability_settings],
       "getPrograms" => ["GET", "/v1/programs", [], [["slug","slug"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_programs],
+      "getProgramsHandleAvailability" => ["GET", "/v1/programs/handle-availability", [], [["handle","handle"]], false, :json, :get_programs_handle_availability],
       "getProgramsId" => ["GET", "/v1/programs/{id}", ["id"], [], false, :json, :get_programs_id],
       "getProgramsIdAutopricing" => ["GET", "/v1/programs/{id}/autopricing", ["id"], [], false, :json, :get_programs_id_autopricing],
       "getProgramsIdCreditRail" => ["GET", "/v1/programs/{id}/credit-rail", ["id"], [], false, :json, :get_programs_id_credit_rail],
@@ -6104,10 +6235,10 @@ module Referalli
       "getProgramsIdRefereeReward" => ["GET", "/v1/programs/{id}/referee-reward", ["id"], [], false, :json, :get_programs_id_referee_reward],
       "getProgramsIdStripeCredits" => ["GET", "/v1/programs/{id}/stripe-credits", ["id"], [], false, :json, :get_programs_id_stripe_credits],
       "getProgramsIdStripeCreditsLog" => ["GET", "/v1/programs/{id}/stripe-credits/log", ["id"], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_programs_id_stripe_credits_log],
-      "getProgramsIdTerms" => ["GET", "/v1/programs/{id}/terms", ["id"], [], false, :json, :get_programs_id_terms],
+      "getProgramsIdTerms" => ["GET", "/v1/programs/{id}/terms", ["id"], [["locale","locale"]], false, :json, :get_programs_id_terms],
       "getProgramsIdTermsAcceptances" => ["GET", "/v1/programs/{id}/terms-acceptances", ["id"], [["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_programs_id_terms_acceptances],
       "getProspects" => ["GET", "/v1/prospects", [], [["status","status"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_prospects],
-      "getPublicProgramsHandle" => ["GET", "/v1/public/programs/{handle}", ["handle"], [], false, :json, :get_public_programs_handle],
+      "getPublicProgramsHandle" => ["GET", "/v1/public/programs/{handle}", ["handle"], [["locale","locale"]], false, :json, :get_public_programs_handle],
       "getReferrals" => ["GET", "/v1/referrals", [], [["programId","program_id"],["partnerId","partner_id"],["status","status"],["customerRef","customer_ref"],["limit","limit"],["starting_after","starting_after"],["ending_before","ending_before"],["created[gte]","created_gte"],["created[lte]","created_lte"]], false, :list, :get_referrals],
       "getReferralsId" => ["GET", "/v1/referrals/{id}", ["id"], [], false, :json, :get_referrals_id],
       "getReferralsIdJourney" => ["GET", "/v1/referrals/{id}/journey", ["id"], [], false, :json, :get_referrals_id_journey],
@@ -6155,6 +6286,7 @@ module Referalli
       "patchAdminStatusIncidentsId" => ["PATCH", "/v1/admin/status/incidents/{id}", ["id"], [], true, :json, :patch_admin_status_incidents_id],
       "patchApiKeysId" => ["PATCH", "/v1/api-keys/{id}", ["id"], [], true, :json, :patch_api_keys_id],
       "patchAuthConnectionsId" => ["PATCH", "/v1/auth/connections/{id}", ["id"], [], true, :json, :patch_auth_connections_id],
+      "patchAuthConnectionsIdOrigins" => ["PATCH", "/v1/auth/connections/{id}/origins", ["id"], [], true, :json, :patch_auth_connections_id_origins],
       "patchBillingConnectionsId" => ["PATCH", "/v1/billing/connections/{id}", ["id"], [], true, :json, :patch_billing_connections_id],
       "patchOrg" => ["PATCH", "/v1/org", [], [], true, :json, :patch_org],
       "patchOrgMembersUserId" => ["PATCH", "/v1/org/members/{userId}", ["userId"], [], true, :json, :patch_org_members_user_id],
@@ -6182,6 +6314,7 @@ module Referalli
       "postAttributionReplay" => ["POST", "/v1/attribution/replay", [], [], true, :json, :post_attribution_replay],
       "postAuthBackchannelLogout" => ["POST", "/v1/auth/backchannel-logout", [], [], true, :json, :post_auth_backchannel_logout],
       "postAuthConnections" => ["POST", "/v1/auth/connections", [], [], true, :json, :post_auth_connections],
+      "postAuthConnectionsIdAccounts" => ["POST", "/v1/auth/connections/{id}/accounts", ["id"], [], true, :json, :post_auth_connections_id_accounts],
       "postAuthConnectionsIdAliases" => ["POST", "/v1/auth/connections/{id}/aliases", ["id"], [], true, :json, :post_auth_connections_id_aliases],
       "postAuthConnectionsIdErase" => ["POST", "/v1/auth/connections/{id}/erase", ["id"], [], true, :json, :post_auth_connections_id_erase],
       "postAuthConnectionsIdPartners" => ["POST", "/v1/auth/connections/{id}/partners", ["id"], [], true, :json, :post_auth_connections_id_partners],
@@ -6197,8 +6330,10 @@ module Referalli
       "postBillingActivate" => ["POST", "/v1/billing/activate", [], [], true, :json, :post_billing_activate],
       "postBillingCheckout" => ["POST", "/v1/billing/checkout", [], [], true, :json, :post_billing_checkout],
       "postBillingConnections" => ["POST", "/v1/billing/connections", [], [], true, :json, :post_billing_connections],
+      "postBillingConnectionsIdEvents" => ["POST", "/v1/billing/connections/{id}/events", ["id"], [], true, :json, :post_billing_connections_id_events],
       "postBillingConnectionsIdRotateSecret" => ["POST", "/v1/billing/connections/{id}/rotate-secret", ["id"], [], false, :json, :post_billing_connections_id_rotate_secret],
       "postBillingConnectionsIdValueMappingPreview" => ["POST", "/v1/billing/connections/{id}/value-mapping/preview", ["id"], [], true, :json, :post_billing_connections_id_value_mapping_preview],
+      "postBillingEventsIdRelease" => ["POST", "/v1/billing/events/{id}/release", ["id"], [], false, :json, :post_billing_events_id_release],
       "postBillingInternalCustomers" => ["POST", "/v1/billing/internal-customers", [], [], true, :json, :post_billing_internal_customers],
       "postBillingPortal" => ["POST", "/v1/billing/portal", [], [], false, :json, :post_billing_portal],
       "postBrandingDomain" => ["POST", "/v1/branding/domain", [], [], true, :json, :post_branding_domain],
@@ -6313,6 +6448,7 @@ module Referalli
       "postPublicProgramsHandleJoin" => ["POST", "/v1/public/programs/{handle}/join", ["handle"], [], true, :json, :post_public_programs_handle_join],
       "postQualityRecompute" => ["POST", "/v1/quality/recompute", [], [], false, :json, :post_quality_recompute],
       "postReferralsAssociate" => ["POST", "/v1/referrals/associate", [], [], true, :json, :post_referrals_associate],
+      "postReferralsHandoffTokens" => ["POST", "/v1/referrals/handoff-tokens", [], [], true, :json, :post_referrals_handoff_tokens],
       "postReferralsIdApprove" => ["POST", "/v1/referrals/{id}/approve", ["id"], [], false, :json, :post_referrals_id_approve],
       "postReferralsIdReassign" => ["POST", "/v1/referrals/{id}/reassign", ["id"], [], true, :json, :post_referrals_id_reassign],
       "postReferralsIdVoid" => ["POST", "/v1/referrals/{id}/void", ["id"], [], false, :json, :post_referrals_id_void],
@@ -6342,7 +6478,9 @@ module Referalli
       "postWidgetTokens" => ["POST", "/v1/widget/tokens", [], [], true, :json, :post_widget_tokens],
       "postZapierConversions" => ["POST", "/v1/zapier/conversions", [], [], true, :json, :post_zapier_conversions],
       "postZapierHooks" => ["POST", "/v1/zapier/hooks", [], [], true, :json, :post_zapier_hooks],
+      "putAuthConnectionsIdOrigins" => ["PUT", "/v1/auth/connections/{id}/origins", ["id"], [], true, :json, :put_auth_connections_id_origins],
       "putAuthConnectionsIdSecret" => ["PUT", "/v1/auth/connections/{id}/secret", ["id"], [], true, :json, :put_auth_connections_id_secret],
+      "putBillingAccountsAccountRefOwner" => ["PUT", "/v1/billing/accounts/{accountRef}/owner", ["accountRef"], [], true, :json, :put_billing_accounts_account_ref_owner],
       "putBillingConnectionsIdCredentials" => ["PUT", "/v1/billing/connections/{id}/credentials", ["id"], [], true, :json, :put_billing_connections_id_credentials],
       "putBillingConnectionsIdSecret" => ["PUT", "/v1/billing/connections/{id}/secret", ["id"], [], true, :json, :put_billing_connections_id_secret],
       "putBillingConnectionsIdValueMapping" => ["PUT", "/v1/billing/connections/{id}/value-mapping", ["id"], [], true, :json, :put_billing_connections_id_value_mapping],

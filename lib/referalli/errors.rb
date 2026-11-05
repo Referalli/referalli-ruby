@@ -37,6 +37,9 @@ module Referalli
   # `bad_request` (HTTP 400).
   class BadRequestError < ApiError; end
 
+  # `invalid_handoff_token` (HTTP 400).
+  class InvalidHandoffTokenError < ApiError; end
+
   # `unauthorized` (HTTP 401).
   class AuthenticationError < ApiError; end
 
@@ -155,6 +158,7 @@ module Referalli
     "validation_error" => ValidationError,
     "mode_mismatch" => ModeMismatchError,
     "bad_request" => BadRequestError,
+    "invalid_handoff_token" => InvalidHandoffTokenError,
     "unauthorized" => AuthenticationError,
     "step_up_required" => StepUpRequiredError,
     "reauth_required" => ReauthRequiredError,
